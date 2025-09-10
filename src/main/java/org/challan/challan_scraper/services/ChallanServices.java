@@ -1,13 +1,73 @@
 package org.challan.challan_scraper.services;
 
+import okhttp3.*;
 import org.challan.challan_scraper.utills.SSLUtills;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ChallanServices {
+    private final OkHttpClient client = SSLUtills.getUnsafeOkHttpClient();
     public String fetchChallanHtml(String vehicleNumber) {
+        String url = "https://rajkotcitypolice.co.in";
+
+        try {
+            Request getRequest = new Request.Builder()
+                    .url(url)
+                    .get()
+                    .build();
+
+            Response getResponse = client.newCall(getRequest).execute();
+            if (!getResponse.isSuccessful()) {
+                throw new IOException("GET failed: " + getResponse);
+            }
+
+            // Extract cookies
+            Headers headers = getResponse.headers();
+            List<String> cookies = headers.values("Set-Cookie");
+            String cookieHeader = String.join("; ", cookies);
+
+            String html = getResponse.body().string();
+            Document doc = Jsoup.parse(html);
+
+            String viewState = doc.select("input[name=__VIEWSTATE]").attr("value");
+            String eventValidation = doc.select("input[name=__EVENTVALIDATION]").attr("value");
+            String viewStateGen = doc.select("input[name=__VIEWSTATEGENERATOR]").attr("value");
+
+            getResponse.close();
+
+            FormBody formBody = new FormBody.Builder()
+                    .add("__VIEWSTATE", viewState)
+                    .add("__VIEWSTATEGENERATOR", viewStateGen)
+                    .add("__EVENTVALIDATION", eventValidation)
+                    .add("ctl00$ContentPlaceHolder1$txtVehicleNo", vehicleNumber)
+                    .add("ctl00$ContentPlaceHolder1$btnSubmit", " Go !")
+                    .build();
+
+            Request postRequest = new Request.Builder()
+                    .url(url)
+                    .post(formBody)
+                    .addHeader("Content-Type", "application/x-www-form-urlencoded")
+                    .addHeader("Cookie", cookieHeader)
+                    .build();
+
+            try (Response postResponse = client.newCall(postRequest).execute()) {
+                if (!postResponse.isSuccessful()) {
+                    throw new IOException("POST failed: " + postResponse);
+                }
+                return postResponse.body().string();
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to fetch challans for vehicle " + vehicleNumber, e);
+        }
+    }
+
+    public String fetchChallanHtmlJsoup(String vehicleNumber) {
         String url = "https://rajkotcitypolice.co.in/";
 
         // Headers
@@ -38,5 +98,11 @@ public class ChallanServices {
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch challans for vehicle " + vehicleNumber, e);
         }
+    }
+
+    public static void main(String[] args) {
+        ChallanServices service = new ChallanServices();
+        String html = service.fetchChallanHtml("GJ03JN3842");
+        System.out.println(html);
     }
 }
