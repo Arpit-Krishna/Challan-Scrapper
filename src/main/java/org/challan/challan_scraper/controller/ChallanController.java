@@ -17,12 +17,25 @@ public class ChallanController {
     private final ChallanServices challanService = new ChallanServices();
 
     @GetMapping("/rajkot")
-    public List<Map<String, String>> getChallans(@RequestParam("vehicleNumber") String vehicleNumber) {
+    public List<Map<String, String>> getRajkotChallans(@RequestParam("vehicleNumber") String vehicleNumber) {
         if (vehicleNumber == null || vehicleNumber.isBlank()) {
             throw new IllegalArgumentException("vehicleNumber is required");
         }
 
         return ChallanParser.parseChallans(challanService.fetchChallanHtml(vehicleNumber));
+    }
+
+    @GetMapping("/ahmedabad")
+    public List<Map<String, String>> getAhmedabadChallans(@RequestParam("vehicleNumber") String vehicleNumber) {
+        if (vehicleNumber == null || vehicleNumber.isBlank()) {
+            throw new IllegalArgumentException("vehicleNumber is required");
+        }
+        try {
+            return ChallanParser.parseChallans(challanService.fetchAhmedabadChallanHtml(vehicleNumber));
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
 

@@ -100,6 +100,74 @@ public class ChallanServices {
         }
     }
 
+    public String fetchAhmedabadChallanHtml(String vehicleNumber) {
+        String BASE_URL = "https://www.payahmedabadechallan.org/";
+
+        try {
+            // Step 1: GET homepage (to grab cookies + hidden fields)
+            Request getRequest = new Request.Builder()
+                    .url(BASE_URL)
+                    .get()
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build();
+
+            Response getResponse = client.newCall(getRequest).execute();
+            if (!getResponse.isSuccessful()) {
+                throw new IOException("GET failed: " + getResponse);
+            }
+
+            // Capture cookies
+            Headers headers = getResponse.headers();
+            List<String> cookies = headers.values("Set-Cookie");
+            String cookieHeader = String.join("; ", cookies);
+
+            // Parse hidden form fields
+            String html = getResponse.body().string();
+            Document doc = Jsoup.parse(html);
+
+            String viewState = doc.select("input[id=__VIEWSTATE]").attr("value");
+            String viewStateGen = doc.select("input[id=__VIEWSTATEGENERATOR]").attr("value");
+            String eventValidation = doc.select("input[id=__EVENTVALIDATION]").attr("value");
+            String captchaAns = doc.select("input[id=ContentPlaceHolder1_hdnCaptchaAns]").attr("value");
+
+            getResponse.close();
+
+            // Step 2: Build POST form body
+            FormBody formBody = new FormBody.Builder()
+                    .add("__LASTFOCUS", "")
+                    .add("__EVENTTARGET", "")
+                    .add("__EVENTARGUMENT", "")
+                    .add("__VIEWSTATE", viewState)
+                    .add("__VIEWSTATEGENERATOR", viewStateGen)
+                    .add("__EVENTVALIDATION", eventValidation)
+                    .add("ctl00$ContentPlaceHolder1$txtVehicleNo", vehicleNumber)
+                    .add("ctl00$ContentPlaceHolder1$hdfTxn", "0")
+                    .add("ctl00$ContentPlaceHolder1$txtCaptcha", captchaAns)
+                    .add("ctl00$ContentPlaceHolder1$hdnCaptchaAns", captchaAns)
+                    .add("ctl00$ContentPlaceHolder1$btnSubmit", " GO !")
+                    .build();
+
+            // Step 3: POST request with cookies
+            Request postRequest = new Request.Builder()
+                    .url(BASE_URL)
+                    .post(formBody)
+                    .header("User-Agent", "Mozilla/5.0")
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .header("Cookie", cookieHeader)
+                    .build();
+
+            try (Response postResponse = client.newCall(postRequest).execute()) {
+                if (!postResponse.isSuccessful()) {
+                    throw new IOException("POST failed: " + postResponse);
+                }
+                return postResponse.body().string();
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to fetch Ahmedabad challans for vehicle " + vehicleNumber, e);
+        }
+    }
+
     public static void main(String[] args) {
         ChallanServices service = new ChallanServices();
         String html = service.fetchChallanHtml("GJ03JN3842");
