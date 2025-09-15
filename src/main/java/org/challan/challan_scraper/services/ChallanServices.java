@@ -104,7 +104,6 @@ public class ChallanServices {
         String BASE_URL = "https://www.payahmedabadechallan.org/";
 
         try {
-            // Step 1: GET homepage (to grab cookies + hidden fields)
             Request getRequest = new Request.Builder()
                     .url(BASE_URL)
                     .get()
@@ -116,12 +115,10 @@ public class ChallanServices {
                 throw new IOException("GET failed: " + getResponse);
             }
 
-            // Capture cookies
             Headers headers = getResponse.headers();
             List<String> cookies = headers.values("Set-Cookie");
             String cookieHeader = String.join("; ", cookies);
 
-            // Parse hidden form fields
             String html = getResponse.body().string();
             Document doc = Jsoup.parse(html);
 
@@ -132,7 +129,6 @@ public class ChallanServices {
 
             getResponse.close();
 
-            // Step 2: Build POST form body
             FormBody formBody = new FormBody.Builder()
                     .add("__LASTFOCUS", "")
                     .add("__EVENTTARGET", "")
@@ -147,7 +143,6 @@ public class ChallanServices {
                     .add("ctl00$ContentPlaceHolder1$btnSubmit", " GO !")
                     .build();
 
-            // Step 3: POST request with cookies
             Request postRequest = new Request.Builder()
                     .url(BASE_URL)
                     .post(formBody)
