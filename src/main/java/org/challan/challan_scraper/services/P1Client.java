@@ -1,3 +1,156 @@
+package org.challan.challan_scraper.services;
+
+import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import org.apache.commons.lang3.StringUtils;
+import org.challan.challan_scraper.DTO.WebSourceContext;
+import org.challan.challan_scraper.DTO.P1Response;
+import org.challan.challan_scraper.DTO.P1Data;
+import org.challan.challan_scraper.utills.MapperUtils;
+import org.challan.challan_scraper.utills.OkHttpUtils;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
+import java.util.List;
+
+@Slf4j
+@Service
+public class P1Client {
+
+    private static final String BASE_URL = "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollection.xhtml";
+    private static final String MAIN_URL = "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionOnlineOdc.xhtml";
+
+    public String getData(String vehicleNum) throws Exception {
+        WebSourceContext context = new WebSourceContext(vehicleNum);
+        buildContext(context);
+
+        P1Response response = callMhOdcApis(context);
+
+        return MapperUtils.convertObjectToString(response);
+    }
+
+    private void buildContext(WebSourceContext context) throws Exception {
+        context.setCookie(callHomepage(context));
+        // viewState will be updated inside subsequent calls
+    }
+
+    private String callHomepage(WebSourceContext context) throws Exception {
+        Request request = new Request.Builder()
+                .url(BASE_URL)
+                .get()
+                .build();
+
+        try (Response response = OkHttpUtils.getOkHttpClient(500).newCall(request).execute()) {
+            if (response.code() == 200) {
+                List<String> cookieHeaders = Arrays.stream(response.headers().values("Set-Cookie").toArray(new String[0])).toList();
+                String[] jSessionId = cookieHeaders.get(0).split(";");
+                String[] serverId = cookieHeaders.get(1).split(";");
+                return serverId[0] + ";" + jSessionId[0];
+            } else {
+                throw new Exception("Failed to fetch homepage cookie for MH ODC");
+            }
+        }
+    }
+
+    private P1Response callMhOdcApis(WebSourceContext context) throws Exception {
+        // STEP 1: Initial GET
+        String html = callGetApi(context, BASE_URL, null);
+        context.setViewState(extractViewStateFromHtml(html));
+
+        // STEP 2: Perform 3 POST calls (simulate form steps)
+        callPostApi(context, "STEP_1", null);
+        callPostApi(context, "STEP_2", null);
+        callPostApi(context, "STEP_3", null);
+
+        // STEP 3: One GET request to fetch form page
+        String formHtml = callGetApi(context, MAIN_URL,
+                BASE_URL);
+        context.setViewState(extractViewStateFromHtml(formHtml));
+
+        // STEP 4: Final POST with vehicle number
+        String finalHtml = callPostApi(context, "FINAL", context.getVehicleNum());
+
+        return createResponse(finalHtml, context);
+    }
+
+    private String callGetApi(WebSourceContext context, String url, String referer) throws Exception {
+        Request.Builder builder = new Request.Builder().url(url).get();
+        if (StringUtils.isNotEmpty(referer)) {
+            builder.addHeader("Referer", referer);
+        }
+        builder.addHeader("Cookie", context.getCookie());
+
+        try (Response response = OkHttpUtils.getOkHttpClient(2000).newCall(builder.build()).execute()) {
+            return response.body().string();
+        }
+    }
+
+    private String callPostApi(WebSourceContext context, String step, String vehicleNum) throws Exception {
+        MediaType mediaType = MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8");
+        String body = getBodyRequestForStep(step, context, vehicleNum);
+
+        Request request = new Request.Builder()
+                .url((step.equals("FINAL")) ? MAIN_URL : BASE_URL)
+                .post(RequestBody.create(mediaType, body))
+                .addHeader("Cookie", context.getCookie())
+                .addHeader("Faces-Request", "partial/ajax")
+                .build();
+
+        try (Response response = OkHttpUtils.getOkHttpClient(3500).newCall(request).execute()) {
+            return response.body().string();
+        }
+    }
+
+    private String getBodyRequestForStep(String step, WebSourceContext context, String vehicleNum) {
+        return switch (step) {
+            case "STEP_1" -> "javax.faces.partial.ajax=true&javax.faces.source=dropdown1&javax.faces.ViewState=" + context.getViewState();
+            case "STEP_2" -> "javax.faces.partial.ajax=true&javax.faces.source=dropdown2&javax.faces.ViewState=" + context.getViewState();
+            case "STEP_3" -> "javax.faces.partial.ajax=true&javax.faces.source=nextButton&javax.faces.ViewState=" + context.getViewState();
+            case "FINAL" -> "javax.faces.partial.ajax=true&javax.faces.source=btnSearch&vehicleNo=" + vehicleNum +
+                    "&javax.faces.ViewState=" + context.getViewState();
+            default -> throw new IllegalArgumentException("Unknown step " + step);
+        };
+    }
+
+    private String extractViewStateFromHtml(String html) {
+        Document doc = Jsoup.parse(html);
+        Element scriptElement = doc.getElementById("j_id1:javax.faces.ViewState:0");
+        return scriptElement != null ? scriptElement.val() : null;
+    }
+
+    private P1Response createResponse(String html, WebSourceContext context) throws Exception {
+        Document doc = Jsoup.parse(html);
+
+        P1Response response = new P1Response();
+        response.setSource("MH");
+        response.setStatus(200);
+        response.setMessage("Success");
+
+        P1Data data = new P1Data();
+        data.setVehicleNum(context.getVehicleNum());
+        data.setOwnerName(doc.select("input#ownerName").val());
+        data.setChassisNo(doc.select("input#chassisNo").val());
+        data.setRegDate(doc.select("input#regDate").val());
+        data.setFitUpto(doc.select("input#fitnessDate").val());
+        data.setInsuranceUpto(doc.select("input#insuranceDate").val());
+        data.setTaxUpto(doc.select("input#taxDate").val());
+
+        response.setData(data);
+
+        return response;
+    }
+}
+
+
+
+
+
 //package org.challan.challan_scraper.services;
 //
 ////import com.cuvora.fireprox.dto.analytics.SearchEvent;
