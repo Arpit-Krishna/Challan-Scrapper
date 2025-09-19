@@ -17,27 +17,23 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
 public class MhOdcScrapper {
 
+    // ======= CONSTANTS =======
     private static final String BASE_URL = "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollection.xhtml";
     private static final String MAIN_URL = "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionOnlineOdc.xhtml";
-
     private static final List<String> FIELD_LIST = Arrays.asList(
-            "Vehicle No.", "Vehicle Type",
-            "Chassis No.", "Owner Name",
-            "Vehicle Class", "GVW (In Kg.)",
-            "Unladen Weight(In Kg.)",
-            "Load Carrying Capacity of Vehicle(In Kg.)",
-            "Road Tax Validity", "Insurance Validity",
-            "Fitness Validity", "PUCC Validity",
+            "Vehicle No.", "Vehicle Type", "Chassis No.", "Owner Name",
+            "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
+            "Load Carrying Capacity of Vehicle(In Kg.)", "Road Tax Validity",
+            "Insurance Validity", "Fitness Validity", "PUCC Validity",
             "Registration Date", "Address"
     );
 
@@ -51,114 +47,43 @@ public class MhOdcScrapper {
                 .build();
     }
 
-    private String extractViewState(String html) throws Exception {
-        Document doc = Jsoup.parse(html);
-        Element el = doc.selectFirst("input[name='javax.faces.ViewState']");
-        if (el == null) el = doc.selectFirst("input[id*='ViewState']");
-        return el != null ? el.attr("value") : null;
-    }
-
-    private String extractViewStateFromXml(String xml) {
-        try {
-            Document doc = Jsoup.parse(xml, "", Parser.xmlParser());
-            Element update = doc.selectFirst("update[id*='ViewState']");
-            if (update != null) return update.text().trim();
-
-            Matcher matcher = Pattern.compile(
-                    "<update\\s+id=\"[^\"]*ViewState[^\"]*\">\\s*<!\\[CDATA\\[(.*?)]]>\\s*</update>",
-                    Pattern.DOTALL
-            ).matcher(xml);
-            if (matcher.find()) return matcher.group(1).trim();
-
-            var dbf = DocumentBuilderFactory.newInstance();
-            var db = dbf.newDocumentBuilder();
-            var xmlDoc = db.parse(new InputSource(new StringReader(xml)));
-            NodeList updates = xmlDoc.getElementsByTagName("update");
-            for (int i = 0; i < updates.getLength(); i++) {
-                var node = updates.item(i);
-                var id = node.getAttributes().getNamedItem("id").getNodeValue();
-                if (id.contains("javax.faces.ViewState")) return node.getTextContent().trim();
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
+    // ======= PUBLIC API =======
     public Map<String, String> fetchVehicleDetails(String vehicleNum) throws Exception {
-        Map<String, String> result;
+        Map<String, String> result = new HashMap<>();
         try {
-            HttpRequest req1 = HttpRequest.newBuilder()
-                    .uri(URI.create(BASE_URL))
-                    .header("User-Agent", "Mozilla/5.0")
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response1 = client.send(req1, HttpResponse.BodyHandlers.ofString());
-            String baseHtml = response1.body();
-            String viewstate1 = extractViewState(baseHtml);
-            if (viewstate1 == null) throw new Exception("Could not extract initial ViewState");
+            // ---- 1: Initial page ----
+            String baseHtml = sendGet(BASE_URL);
+            String viewState1 = extractViewState(baseHtml, false);
 
             Document initialDoc = Jsoup.parse(baseHtml);
             String formName = extractFormName(initialDoc);
-            String stateFieldName = extractStateFieldName(initialDoc);
-            String operationFieldName = extractOperationFieldName(initialDoc);
+            String stateField = extractStateFieldName(initialDoc);
+            String opField = extractOperationFieldName(initialDoc);
             String goButton = findGoButtonId(initialDoc);
 
-            String statePayload = buildStateSelectionPayload(formName, stateFieldName, operationFieldName, viewstate1);
-            HttpRequest req2 = HttpRequest.newBuilder()
-                    .uri(URI.create(BASE_URL))
-                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                    .header("Faces-Request", "partial/ajax")
-                    .header("X-Requested-With", "XMLHttpRequest")
-                    .POST(HttpRequest.BodyPublishers.ofString(statePayload))
-                    .build();
-            HttpResponse<String> response2 = client.send(req2, HttpResponse.BodyHandlers.ofString());
-            String viewstate2 = extractViewStateFromXml(response2.body());
-            if (viewstate2 == null) throw new Exception("Could not extract ViewState after state selection");
+            // ---- 2: Select state ----
+            String payload2 = buildStateSelectionPayload(formName, stateField, opField, viewState1);
+            String resp2 = sendPost(BASE_URL, payload2, true);
+            String viewState2 = extractViewState(resp2, true);
 
-            String opPayload = buildOperationSelectionPayload(formName, stateFieldName, operationFieldName, viewstate2);
-            HttpRequest req3 = HttpRequest.newBuilder()
-                    .uri(URI.create(BASE_URL))
-                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                    .header("Faces-Request", "partial/ajax")
-                    .header("X-Requested-With", "XMLHttpRequest")
-                    .POST(HttpRequest.BodyPublishers.ofString(opPayload))
-                    .build();
-            HttpResponse<String> response3 = client.send(req3, HttpResponse.BodyHandlers.ofString());
-            String viewstate3 = extractViewStateFromXml(response3.body());
-            if (viewstate3 == null) throw new Exception("Could not extract ViewState after operation selection");
+            // ---- 3: Select operation ----
+            String payload3 = buildOperationSelectionPayload(formName, stateField, opField, viewState2);
+            String resp3 = sendPost(BASE_URL, payload3, true);
+            String viewState3 = extractViewState(resp3, true);
 
-            String submitPayload = buildFormSubmissionPayload(formName, stateFieldName, goButton, operationFieldName, viewstate3);
-            HttpRequest req4 = HttpRequest.newBuilder()
-                    .uri(URI.create(BASE_URL))
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .header("User-Agent", "Mozilla/5.0")
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .POST(HttpRequest.BodyPublishers.ofString(submitPayload))
-                    .build();
-            client.send(req4, HttpResponse.BodyHandlers.ofString());
+            // ---- 4: Submit form ----
+            String payload4 = buildFormSubmissionPayload(formName, stateField, goButton, opField, viewState3);
+            sendPost(BASE_URL, payload4, false);
 
-            HttpRequest req5 = HttpRequest.newBuilder()
-                    .uri(URI.create(MAIN_URL))
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .header("User-Agent", "Mozilla/5.0")
-                    .GET()
-                    .build();
-            HttpResponse<String> response5 = client.send(req5, HttpResponse.BodyHandlers.ofString());
-            String odcHtml = response5.body();
-            String viewstateOdc = extractViewState(odcHtml);
-            if (viewstateOdc == null) throw new Exception("Could not extract ODC form ViewState");
+            // ---- 5: ODC page ----
+            String odcHtml = sendGet(MAIN_URL);
+            String viewStateOdc = extractViewState(odcHtml, false);
 
-            String vehiclePayload = buildVehicleSearchPayload(vehicleNum, viewstateOdc, odcHtml);
-            HttpRequest req6 = HttpRequest.newBuilder()
-                    .uri(URI.create(MAIN_URL))
-                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                    .header("Faces-Request", "partial/ajax")
-                    .header("X-Requested-With", "XMLHttpRequest")
-                    .POST(HttpRequest.BodyPublishers.ofString(vehiclePayload))
-                    .build();
-            HttpResponse<String> response6 = client.send(req6, HttpResponse.BodyHandlers.ofString());
-            result = parseVehicleDetailsFromResponse(response6.body(), vehicleNum);
+            // ---- 6: Vehicle search ----
+            String payload6 = buildVehicleSearchPayload(vehicleNum, viewStateOdc, odcHtml);
+            String resp6 = sendPost(MAIN_URL, payload6, true);
+
+            result = parseVehicleDetailsFromResponse(resp6, vehicleNum);
 
         } catch (Exception e) {
             throw new Exception("Error fetching vehicle details: " + e.getMessage(), e);
@@ -166,18 +91,67 @@ public class MhOdcScrapper {
         return result;
     }
 
-    private String buildFormSubmissionPayload(String formName, String stateFieldName, String goButton,
-                                              String operationFieldName, String viewstate) {
-        return formName + "=" + formName +
-                "&" + stateFieldName + "=MH" +
-                "&" + operationFieldName + "=5007" +
-                "&" + goButton + "=" + goButton +
-                "&javax.faces.ViewState=" + java.net.URLEncoder.encode(viewstate, java.nio.charset.StandardCharsets.UTF_8);
+    // ======= HTTP HELPERS =======
+    private String sendGet(String url) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("User-Agent", "Mozilla/5.0")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .GET()
+                .build();
+        return client.send(req, HttpResponse.BodyHandlers.ofString()).body();
     }
 
+    private String sendPost(String url, String payload, boolean ajax) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                .header("User-Agent", "Mozilla/5.0")
+                .POST(HttpRequest.BodyPublishers.ofString(payload));
+        if (ajax) {
+            builder.header("Faces-Request", "partial/ajax")
+                    .header("X-Requested-With", "XMLHttpRequest");
+        } else {
+            builder.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        }
+        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString()).body();
+    }
+
+    // ======= VIEWSTATE EXTRACTION =======
+    private String extractViewState(String content, boolean isXml) throws Exception {
+        if (!isXml) {
+            Document doc = Jsoup.parse(content);
+            Element el = doc.selectFirst("input[name='javax.faces.ViewState'], input[id*='ViewState']");
+            return el != null ? el.attr("value") : null;
+        }
+        // XML parsing
+        Document doc = Jsoup.parse(content, "", Parser.xmlParser());
+        Element update = doc.selectFirst("update[id*='ViewState']");
+        if (update != null) return update.text().trim();
+
+        Matcher matcher = Pattern.compile(
+                "<update\\s+id=\"[^\"]*ViewState[^\"]*\">\\s*<!\\[CDATA\\[(.*?)]]>\\s*</update>",
+                Pattern.DOTALL
+        ).matcher(content);
+        if (matcher.find()) return matcher.group(1).trim();
+
+        // Fallback DOM
+        var dbf = DocumentBuilderFactory.newInstance();
+        var db = dbf.newDocumentBuilder();
+        var xmlDoc = db.parse(new InputSource(new StringReader(content)));
+        NodeList updates = xmlDoc.getElementsByTagName("update");
+        for (int i = 0; i < updates.getLength(); i++) {
+            var node = updates.item(i);
+            var id = node.getAttributes().getNamedItem("id").getNodeValue();
+            if (id.contains("javax.faces.ViewState")) return node.getTextContent().trim();
+        }
+        return null;
+    }
+
+    // ======= FORM HELPERS =======
     private String findGoButtonId(Document doc) {
         for (Element button : doc.select("button"))
-            if (button.text().trim().equalsIgnoreCase("Go")) return button.id();
+            if ("Go".equalsIgnoreCase(button.text().trim())) return button.id();
         return null;
     }
 
@@ -188,84 +162,89 @@ public class MhOdcScrapper {
 
     private String extractStateFieldName(Document doc) {
         Element stateSelect = doc.selectFirst("select option[value='MH']");
-        if (stateSelect != null) return stateSelect.parent().attr("name");
-        return "ib_state_input";
+        return stateSelect != null ? stateSelect.parent().attr("name") : "ib_state_input";
     }
 
     private String extractOperationFieldName(Document doc) {
-        Element operationSelect = doc.selectFirst("select option[value='5007']");
-        if (operationSelect != null) return operationSelect.parent().attr("name");
-        return "operation_code_input";
+        Element opSelect = doc.selectFirst("select option[value='5007']");
+        return opSelect != null ? opSelect.parent().attr("name") : "operation_code_input";
     }
 
-    private String buildStateSelectionPayload(String formName, String stateFieldName,
-                                              String operationFieldName, String viewstate) {
+    // ======= PAYLOAD BUILDERS =======
+    private String buildStateSelectionPayload(String form, String stateField,
+                                              String opField, String viewState) {
         return "javax.faces.partial.ajax=true" +
-                "&javax.faces.source=" + stateFieldName.replace("_input", "") +
-                "&javax.faces.partial.execute=" + stateFieldName.replace("_input", "") +
-                "&javax.faces.partial.render=" + operationFieldName.replace("_input", "") +
+                "&javax.faces.source=" + stateField.replace("_input", "") +
+                "&javax.faces.partial.execute=" + stateField.replace("_input", "") +
+                "&javax.faces.partial.render=" + opField.replace("_input", "") +
                 "&javax.faces.behavior.event=change" +
                 "&javax.faces.partial.event=change" +
-                "&" + formName + "=" + formName +
-                "&" + stateFieldName + "=MH" +
-                "&" + operationFieldName + "=-1" +
-                "&javax.faces.ViewState=" + java.net.URLEncoder.encode(viewstate, java.nio.charset.StandardCharsets.UTF_8);
+                "&" + form + "=" + form +
+                "&" + stateField + "=MH" +
+                "&" + opField + "=-1" +
+                "&javax.faces.ViewState=" + enc(viewState);
     }
 
-    private String buildOperationSelectionPayload(String formName, String stateFieldName,
-                                                  String operationFieldName, String viewstate) {
+    private String buildOperationSelectionPayload(String form, String stateField,
+                                                  String opField, String viewState) {
         return "javax.faces.partial.ajax=true" +
-                "&javax.faces.source=" + operationFieldName.replace("_input", "") +
-                "&javax.faces.partial.execute=" + operationFieldName.replace("_input", "") +
-                "&javax.faces.partial.render=" + operationFieldName.replace("_input", "") +
+                "&javax.faces.source=" + opField.replace("_input", "") +
+                "&javax.faces.partial.execute=" + opField.replace("_input", "") +
+                "&javax.faces.partial.render=" + opField.replace("_input", "") +
                 "&javax.faces.behavior.event=change" +
                 "&javax.faces.partial.event=change" +
-                "&" + formName + "=" + formName +
-                "&" + stateFieldName + "=MH" +
-                "&" + operationFieldName + "=5007" +
-                "&javax.faces.ViewState=" + java.net.URLEncoder.encode(viewstate, java.nio.charset.StandardCharsets.UTF_8);
+                "&" + form + "=" + form +
+                "&" + stateField + "=MH" +
+                "&" + opField + "=5007" +
+                "&javax.faces.ViewState=" + enc(viewState);
     }
 
-    private String buildVehicleSearchPayload(String vehicleNum, String viewstate, String html) throws Exception {
+    private String buildFormSubmissionPayload(String form, String stateField,
+                                              String goButton, String opField, String viewState) {
+        return form + "=" + form +
+                "&" + stateField + "=MH" +
+                "&" + opField + "=5007" +
+                "&" + goButton + "=" + goButton +
+                "&javax.faces.ViewState=" + enc(viewState);
+    }
+
+    private String buildVehicleSearchPayload(String vehicleNum, String viewState, String html) throws Exception {
         Document doc = Jsoup.parse(html);
         String formName = extractFormName(doc);
 
         Element vehicleInput = doc.selectFirst("input[maxlength='10']");
-        String vehicleFieldName = vehicleInput != null ? vehicleInput.attr("name") : "j_idt43:j_idt48";
+        String vehicleField = vehicleInput != null ? vehicleInput.attr("name") : "j_idt43:j_idt48";
 
-        Element getDetailsButton = doc.selectFirst("button[title*='get owner and vehicle details']");
-        String buttonName = getDetailsButton != null ? getDetailsButton.attr("name") : "j_idt43:getdetails";
+        Element detailsBtn = doc.selectFirst("button[title*='get owner and vehicle details']");
+        String btnName = detailsBtn != null ? detailsBtn.attr("name") : "j_idt43:getdetails";
 
         StringBuilder payload = new StringBuilder();
         payload.append("javax.faces.partial.ajax=true")
-                .append("&javax.faces.source=").append(buttonName)
+                .append("&javax.faces.source=").append(btnName)
                 .append("&javax.faces.partial.execute=@all")
                 .append("&javax.faces.partial.render=taxcollodc popup")
-                .append("&").append(buttonName).append("=").append(buttonName)
+                .append("&").append(btnName).append("=").append(btnName)
                 .append("&").append(formName).append("=").append(formName)
-                .append("&").append(vehicleFieldName).append("=").append(vehicleNum);
+                .append("&").append(vehicleField).append("=").append(vehicleNum);
 
-        addAllFormFields(doc, payload);
-        payload.append("&javax.faces.ViewState=").append(java.net.URLEncoder.encode(viewstate, java.nio.charset.StandardCharsets.UTF_8));
+        appendFormFields(doc, payload);
+        payload.append("&javax.faces.ViewState=").append(enc(viewState));
         return payload.toString();
     }
 
-    private void addAllFormFields(Document doc, StringBuilder payload) {
+    private void appendFormFields(Document doc, StringBuilder payload) {
         for (Element select : doc.select("select")) {
             String name = select.attr("name");
             if (!name.isEmpty()) {
-                Element selectedOption = select.selectFirst("option[selected]");
-                String value = selectedOption != null ? selectedOption.attr("value") : "-1";
-                payload.append("&").append(name).append("=")
-                        .append(java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8));
+                Element selected = select.selectFirst("option[selected]");
+                String value = selected != null ? selected.attr("value") : "-1";
+                payload.append("&").append(name).append("=").append(enc(value));
             }
         }
         for (Element input : doc.select("input[type='text'], input[type='hidden']")) {
             String name = input.attr("name");
-            String value = input.attr("value");
             if (!name.isEmpty() && !name.contains("ViewState")) {
-                payload.append("&").append(name).append("=")
-                        .append(java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8));
+                payload.append("&").append(name).append("=").append(enc(input.attr("value")));
             }
         }
         for (Element checkbox : doc.select("input[type='checkbox']")) {
@@ -277,30 +256,35 @@ public class MhOdcScrapper {
         }
     }
 
+    private String enc(String val) {
+        return URLEncoder.encode(val, StandardCharsets.UTF_8);
+    }
+
+    // ======= RESPONSE PARSER =======
     private Map<String, String> parseVehicleDetailsFromResponse(String xmlResponse, String vehicleNum) {
         Map<String, String> result = new HashMap<>();
         try {
             Document xmlDoc = Jsoup.parse(xmlResponse, Parser.xmlParser());
             for (Element update : xmlDoc.select("update")) {
-                String updateId = update.attr("id");
-                if (updateId.contains("taxcollodc") || updateId.contains("popup")) {
-                    Document contentDoc = Jsoup.parse(update.text());
+                String id = update.attr("id");
+                if (id.contains("taxcollodc") || id.contains("popup")) {
+                    Document content = Jsoup.parse(update.text());
                     for (String label : FIELD_LIST) {
-                        Element labelElement = contentDoc.selectFirst("span.ui-outputlabel-label:contains(" + label + ")");
-                        if (labelElement != null) {
-                            Element parentLabel = labelElement.closest("label.field-label");
-                            if (parentLabel != null) {
-                                Element inputElement = parentLabel.nextElementSibling();
-                                if (inputElement != null) {
+                        Element labelEl = content.selectFirst("span.ui-outputlabel-label:contains(" + label + ")");
+                        if (labelEl != null) {
+                            Element parent = labelEl.closest("label.field-label");
+                            if (parent != null) {
+                                Element inputEl = parent.nextElementSibling();
+                                if (inputEl != null) {
                                     String value = "";
-                                    if (inputElement.tagName().equals("input")) {
-                                        value = inputElement.attr("value");
-                                    } else if (inputElement.hasClass("ui-selectonemenu")) {
-                                        Element selectedOption = inputElement.selectFirst("select option[selected]");
-                                        if (selectedOption != null) value = selectedOption.text();
-                                    } else if (inputElement.hasClass("ui-calendar")) {
-                                        Element calendarInput = inputElement.selectFirst("input");
-                                        if (calendarInput != null) value = calendarInput.attr("value");
+                                    if (inputEl.tagName().equals("input")) {
+                                        value = inputEl.attr("value");
+                                    } else if (inputEl.hasClass("ui-selectonemenu")) {
+                                        Element selected = inputEl.selectFirst("select option[selected]");
+                                        if (selected != null) value = selected.text();
+                                    } else if (inputEl.hasClass("ui-calendar")) {
+                                        Element calInput = inputEl.selectFirst("input");
+                                        if (calInput != null) value = calInput.attr("value");
                                     }
                                     result.put(label, value);
                                 }
