@@ -1,19 +1,20 @@
 package org.challan.challan_scraper.DTO;
-import java.util.Map;
+import lombok.Data;
 
-
+@Data   // Lombok or generate getters/setters
 public class VehicleDetails {
-    private Map<String, String> fields;
-
-    public VehicleDetails(Map<String, String> fields) {
-        this.fields = fields;
-    }
-
-    public Map<String, String> getFields() {
-        return fields;
-    }
-
-    public void setFields(Map<String, String> fields) {
-        this.fields = fields;
-    }
+    private String vehicleNo;
+    private String vehicleType;
+    private String chassisNo;
+    private String ownerName;
+    private String vehicleClass;
+    private String gvw;
+    private String unladenWeight;
+    private String loadCapacity;
+    private String roadTaxValidity;
+    private String insuranceValidity;
+    private String fitnessValidity;
+    private String puccValidity;
+    private String registrationDate;
+    private String address;
 }

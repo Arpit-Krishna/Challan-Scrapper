@@ -32,11 +32,21 @@ public class ParivahanController {
     public ResponseEntity<Map<String, String>> fetchVehicle(@PathVariable String vehicleNum) throws Exception {
         try {
             Map<String, String> details = services.getVehicleDetails(vehicleNum);
-//            String response = p1Client.getData(vehicleNum);
             return ResponseEntity.ok(details);
         } catch (Exception e) {
             return ResponseEntity.status(500)
                     .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/mh/p1odc/{vehicleNum}")
+    public ResponseEntity<String> fetchP1Vehicle(@PathVariable String vehicleNum) throws Exception {
+        try {
+            String response = p1Client.getData(vehicleNum);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("error" + e.getMessage());
         }
     }
 }

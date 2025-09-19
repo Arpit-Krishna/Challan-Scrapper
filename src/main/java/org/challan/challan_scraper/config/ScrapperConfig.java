@@ -8,10 +8,10 @@ import java.net.CookiePolicy;
 @Configuration
 public class ScrapperConfig {
 
-    @Bean
-    public CookieManager cookieManager() {
-        CookieManager cookieManager = new CookieManager();
-        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
-        return cookieManager;
-    }
+//    @Bean
+//    public CookieManager cookieManager() {
+//        CookieManager cookieManager = new CookieManager();
+//        cookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ALL);
+//        return cookieManager;
+//    }
 }

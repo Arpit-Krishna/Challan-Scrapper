@@ -8,14 +8,13 @@ public class WebSourceContext {
     private String cookie;
     private String viewState;
     private String stateName;
-    private String chassis;
+
+    private String formName;
+    private String stateField;
+    private String operationField;
+    private String goButton;
 
     public WebSourceContext(String vehicleNum) {
         this.vehicleNum = vehicleNum;
-    }
-
-    public WebSourceContext(String vehicleNum, String chassis) {
-        this.vehicleNum = vehicleNum;
-        this.chassis = chassis;
     }
 }
