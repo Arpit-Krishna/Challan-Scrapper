@@ -42,7 +42,7 @@ public class ParivahanController {
     @PostMapping("/mh/p1odc/{vehicleNum}")
     public ResponseEntity<String> fetchP1Vehicle(@PathVariable String vehicleNum) throws Exception {
         try {
-            String response = p1Client.getData(vehicleNum);
+            String response = p1Client.getData(vehicleNum, "MH", "5007");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500)

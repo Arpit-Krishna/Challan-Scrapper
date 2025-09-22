@@ -41,13 +41,13 @@ public class P1Client {
             "Registration Date", "Address"
     );
 
-    public String getData(String vehicleNum) throws Exception {
+    public String getData(String vehicleNum, String stateCode, String opCode) throws Exception {
         WebSourceContext ctx = new WebSourceContext(vehicleNum);
+        ctx.setStateCode(stateCode);
+        ctx.setOpCode(opCode);
 
         // fetch initial cookies
         ctx.setCookie(fetchInitialCookie());
-
-        // perform full scraping flow
         P1Response resp = scrapeVehicleDetails(ctx);
 
         return MapperUtils.convertObjectToString(resp);
@@ -56,16 +56,15 @@ public class P1Client {
     private P1Response scrapeVehicleDetails(WebSourceContext ctx) throws Exception {
         // STEP-1: Initial GET
         String html = doGet(BASE_URL, ctx, null);
-        enrichContextFromHtml(ctx, html, false);
+        enrichContextFromHtml(ctx, html);
 
         // STEP-2: 3 POST calls
         doPost(BASE_URL, ctx, buildBody("STEP_1", ctx, null, html), true);
         doPost(BASE_URL, ctx, buildBody("STEP_2", ctx, null, html), true);
-        doPost(BASE_URL, ctx, buildBody("STEP_3", ctx, null, html), false);
 
         // STEP-3: GET main form page
         String formHtml = doGet(MAIN_URL, ctx, BASE_URL);
-        enrichContextFromHtml(ctx, formHtml, false);
+        enrichContextFromHtml(ctx, formHtml);
 
         // STEP-4: Final POST with vehicle number
         String finalHtml = doPost(MAIN_URL, ctx, buildBody("FINAL", ctx, ctx.getVehicleNum(), formHtml), true);
@@ -125,17 +124,13 @@ public class P1Client {
     // ----------------------------------------------------------
 
     private String buildBody(String step, WebSourceContext ctx, String vehicleNo, String html) throws Exception {
-        String form = ctx.getFormName();
-        String stateField = ctx.getStateField();
-        String opField = ctx.getOperationField();
         String goButton = ctx.getGoButton();
         String viewState = ctx.getViewState();
 
         return switch (step) {
-            case "STEP_1" -> buildStateSelectionPayload(form, stateField, opField, viewState);
-            case "STEP_2" -> buildOperationSelectionPayload(form, stateField, opField, viewState);
-            case "STEP_3" -> buildFormSubmissionPayload(form, stateField, goButton, opField, viewState);
-            case "FINAL"  -> buildVehicleSearchPayload(form, vehicleNo, viewState, html);
+            case "STEP_1" -> buildStateSelectionPayload(ctx.getStateCode(), viewState);
+            case "STEP_2" -> buildOperationSelectionPayload(ctx.getStateCode(), ctx.getOpCode(), goButton, viewState);
+            case "FINAL"  -> buildVehicleSearchPayload(vehicleNo, viewState, html);
             default -> throw new IllegalArgumentException("Unknown step " + step);
         };
     }
@@ -236,14 +231,10 @@ public class P1Client {
     }
 
     // ======= CONTEXT ENRICHMENT =======
-    private void enrichContextFromHtml(WebSourceContext ctx, String html, boolean xml) throws Exception {
-        String vs = extractViewState(html, xml);
+    private void enrichContextFromHtml(WebSourceContext ctx, String html) throws Exception {
+        String vs = extractViewState(html, false);
         if (StringUtils.isNotBlank(vs)) ctx.setViewState(vs);
-
         Document doc = Jsoup.parse(html);
-        if (StringUtils.isBlank(ctx.getFormName())) ctx.setFormName(extractFormName(doc));
-        if (StringUtils.isBlank(ctx.getStateField())) ctx.setStateField(extractStateFieldName(doc));
-        if (StringUtils.isBlank(ctx.getOperationField())) ctx.setOperationField(extractOperationFieldName(doc));
         if (StringUtils.isBlank(ctx.getGoButton())) ctx.setGoButton(findGoButtonId(doc));
     }
 
@@ -255,68 +246,28 @@ public class P1Client {
         return null;
     }
 
-    private String extractFormName(Document doc) {
-        Element form = doc.selectFirst("form[method='post']");
-        return form != null ? form.attr("id") : "master_Layout_form";
-    }
 
-    private String extractStateFieldName(Document doc) {
-        Element stateSelect = doc.selectFirst("select option[value='MH']");
-        return stateSelect != null ? stateSelect.parent().attr("name") : "ib_state_input";
-    }
-
-    private String extractOperationFieldName(Document doc) {
-        Element opSelect = doc.selectFirst("select option[value='5007']");
-        return opSelect != null ? opSelect.parent().attr("name") : "operation_code_input";
-    }
 
     // ======= PAYLOAD BUILDERS =======
-    private String buildStateSelectionPayload(String form, String stateField,
-                                              String opField, String viewState) {
-        return "javax.faces.partial.ajax=true" +
-                "&javax.faces.source=" + stateField.replace("_input", "") +
-                "&javax.faces.partial.execute=" + stateField.replace("_input", "") +
-                "&javax.faces.partial.render=" + opField.replace("_input", "") +
-                "&javax.faces.behavior.event=change" +
-                "&javax.faces.partial.event=change" +
-                "&" + form + "=" + form +
-                "&" + stateField + "=MH" +
-                "&" + opField + "=-1" +
-                "&javax.faces.ViewState=" + enc(viewState);
+    private String buildStateSelectionPayload(String stateCode, String viewState) {
+        return "javax.faces.partial.ajax=true&javax.faces.source=ib_state&javax.faces.partial.execute=ib_state&javax.faces.partial.render=operation_code&javax.faces.behavior.event=change" +
+                "&javax.faces.partial.event=change&master_Layout_form=master_Layout_form&ib_state_input=" + stateCode + "&operation_code_focus=&operation_code_input=-1&javax.faces.ViewState=" + enc(viewState);
     }
 
-    private String buildOperationSelectionPayload(String form, String stateField,
-                                                  String opField, String viewState) {
-        return "javax.faces.partial.ajax=true" +
-                "&javax.faces.source=" + opField.replace("_input", "") +
-                "&javax.faces.partial.execute=" + opField.replace("_input", "") +
-                "&javax.faces.partial.render=" + opField.replace("_input", "") +
-                "&javax.faces.behavior.event=change" +
-                "&javax.faces.partial.event=change" +
-                "&" + form + "=" + form +
-                "&" + stateField + "=MH" +
-                "&" + opField + "=5007" +
-                "&javax.faces.ViewState=" + enc(viewState);
+    private String buildOperationSelectionPayload(String stateCode, String opCode,String goButtonId, String viewState) {
+        return "javax.faces.partial.ajax=true&javax.faces.source= " + goButtonId + "&javax.faces.partial.execute=%40all" + "&" + goButtonId + "=" + goButtonId + "&PAYMENT_TYPE=ONLINE" +
+                "&master_Layout_form=master_Layout_form&ib_state_focus=&ib_state_input=" +  stateCode + "&operation_code_focus=&operation_code_input=" + opCode +  "&javax.faces.ViewState=" + enc(viewState);
     }
 
-    private String buildFormSubmissionPayload(String form, String stateField,
-                                              String goButton, String opField, String viewState) {
-        return form + "=" + form +
-                "&" + stateField + "=MH" +
-                "&" + opField + "=5007" +
-                "&" + goButton + "=" + goButton +
-                "&javax.faces.ViewState=" + enc(viewState);
-    }
 
-    private String buildVehicleSearchPayload(String formName, String vehicleNum,
-                                             String viewState, String html) throws Exception {
+    private String buildVehicleSearchPayload(String vehicleNum, String viewState, String html) throws Exception {
         Document doc = Jsoup.parse(html);
 
         Element vehicleInput = doc.selectFirst("input[maxlength='10']");
-        String vehicleField = vehicleInput != null ? vehicleInput.attr("name") : "j_idt43:j_idt48";
+        String vehicleField = vehicleInput.attr("name") ;
 
         Element detailsBtn = doc.selectFirst("button[title*='get owner and vehicle details']");
-        String btnName = detailsBtn != null ? detailsBtn.attr("name") : "j_idt43:getdetails";
+        String btnName = detailsBtn.attr("name");
 
         StringBuilder payload = new StringBuilder();
         payload.append("javax.faces.partial.ajax=true")
@@ -324,7 +275,7 @@ public class P1Client {
                 .append("&javax.faces.partial.execute=@all")
                 .append("&javax.faces.partial.render=taxcollodc popup")
                 .append("&").append(btnName).append("=").append(btnName)
-                .append("&").append(formName).append("=").append(formName)
+                .append("&master_Layout_form=master_Layout_form")
                 .append("&").append(vehicleField).append("=").append(vehicleNum);
 
         appendFormFields(doc, payload);

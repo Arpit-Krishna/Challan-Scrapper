@@ -7,11 +7,8 @@ public class WebSourceContext {
     private String vehicleNum;
     private String cookie;
     private String viewState;
-    private String stateName;
-
-    private String formName;
-    private String stateField;
-    private String operationField;
+    private String stateCode;
+    private String opCode;
     private String goButton;
 
     public WebSourceContext(String vehicleNum) {
