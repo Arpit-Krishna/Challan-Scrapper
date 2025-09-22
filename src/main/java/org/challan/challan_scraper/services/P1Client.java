@@ -67,7 +67,7 @@ public class P1Client {
         enrichContextFromHtml(ctx, formHtml);
 
         // STEP-4: Final POST with vehicle number
-        String finalHtml = doPost(MAIN_URL, ctx, buildBody("FINAL", ctx, ctx.getVehicleNum(), formHtml), true);
+        String finalHtml = doPost(MAIN_URL, ctx, buildBody("STEP_3", ctx, ctx.getVehicleNum(), formHtml), true);
 
         // Parse details
         return parseVehicleDetails(finalHtml, ctx);
@@ -130,7 +130,7 @@ public class P1Client {
         return switch (step) {
             case "STEP_1" -> buildStateSelectionPayload(ctx.getStateCode(), viewState);
             case "STEP_2" -> buildOperationSelectionPayload(ctx.getStateCode(), ctx.getOpCode(), goButton, viewState);
-            case "FINAL"  -> buildVehicleSearchPayload(vehicleNo, viewState, html);
+            case "STEP_3"  -> buildVehicleSearchPayload(vehicleNo, viewState, html);
             default -> throw new IllegalArgumentException("Unknown step " + step);
         };
     }
