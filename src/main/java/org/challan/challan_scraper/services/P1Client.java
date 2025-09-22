@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.challan.challan_scraper.DTO.P1Data;
 import org.challan.challan_scraper.DTO.P1Response;
 import org.challan.challan_scraper.DTO.WebSourceContext;
+import org.challan.challan_scraper.constants.P1Constants;
 import org.challan.challan_scraper.utills.MapperUtils;
 import org.challan.challan_scraper.utills.OkHttpUtils;
 import org.jsoup.Jsoup;
@@ -25,30 +26,19 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.challan.challan_scraper.constants.P1Constants.*;
+
 @Slf4j
 @Service
 public class P1Client {
 
-    private static final String BASE_URL =
-            "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollection.xhtml";
-    private static final String MAIN_URL_ODC =
-            "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionOnlineOdc.xhtml";
-    private static final String MAIN_URL_TAX =
-            "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionMainOnline.xhtml";
-    private static final List<String> FIELD_LIST = Arrays.asList(
-            "Vehicle No.", "Vehicle Type", "Chassis No.", "Owner Name", "Mobile No.",
-            "From State", "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
-            "Load Carrying Capacity of Vehicle(In Kg.)", "Road Tax Validity",
-            "Insurance Validity", "Fitness Validity", "PUCC Validity",
-            "Registration Date", "Address", "Seating Cap(Ex. Driver)"
-
-    );
-
-    public String getData(String vehicleNum, String stateCode, String opCode) throws Exception {
+    public String getData(String vehicleNum, String stateCode) throws Exception {
         WebSourceContext ctx = new WebSourceContext(vehicleNum);
+
         ctx.setStateCode(stateCode);
-        ctx.setOpCode(opCode);
-        ctx.setMAIN_URL((stateCode.equals("MH"))? MAIN_URL_ODC : MAIN_URL_TAX);
+        ctx.setOpCode(opCode.get(stateCode));
+
+        ctx.setMAIN_URL((stateCode.equals("MH"))? P1_TAX_ODC_URL : P1_TAX_COL_URL);
         if(stateCode.equals("MH")) {
             ctx.setUpdateTag("taxcollodc");
         }
@@ -56,8 +46,6 @@ public class P1Client {
             ctx.setUpdateTag(stateCode.toLowerCase() + "taxcollection");
         }
 
-
-        // fetch initial cookies
         ctx.setCookie(fetchInitialCookie());
         P1Response resp = scrapeVehicleDetails(ctx);
 
@@ -66,16 +54,16 @@ public class P1Client {
 
     private P1Response scrapeVehicleDetails(WebSourceContext ctx) throws Exception {
         // STEP-1: Initial GET
-        String html = doGet(BASE_URL, ctx, null);
+        String html = doGet(P1Constants.P1_HOMEPAGE_URL, ctx, null);
         String MAIN_URL = ctx.getMAIN_URL();
         enrichContextFromHtml(ctx, html);
 
         // STEP-2: 3 POST calls
-        doPost(BASE_URL, ctx, buildBody("STEP_1", ctx, null, html));
-        doPost(BASE_URL, ctx, buildBody("STEP_2", ctx, null, html));
+        doPost(P1Constants.P1_HOMEPAGE_URL, ctx, buildBody("STEP_1", ctx, null, html));
+        doPost(P1Constants.P1_HOMEPAGE_URL, ctx, buildBody("STEP_2", ctx, null, html));
 
         // STEP-3: GET main form page
-        String formHtml = doGet(MAIN_URL, ctx, BASE_URL);
+        String formHtml = doGet(MAIN_URL, ctx, P1Constants.P1_HOMEPAGE_URL);
         enrichContextFromHtml(ctx, formHtml);
 
         // STEP-4: Final POST with vehicle number
@@ -90,7 +78,7 @@ public class P1Client {
     // ----------------------------------------------------------
 
     private String fetchInitialCookie() throws Exception {
-        Request req = new Request.Builder().url(BASE_URL).get().build();
+        Request req = new Request.Builder().url(P1Constants.P1_HOMEPAGE_URL).get().build();
         try (Response res = OkHttpUtils.getOkHttpClient(20000).newCall(req).execute()) {
             if (res.code() != 200) throw new Exception("Failed to get homepage cookie");
             List<String> cookies = Arrays.asList(res.headers("Set-Cookie").toArray(new String[0]));
