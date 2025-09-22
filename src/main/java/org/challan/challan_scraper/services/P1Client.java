@@ -31,11 +31,13 @@ public class P1Client {
 
     private static final String BASE_URL =
             "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollection.xhtml";
-    private static final String MAIN_URL =
+    private static final String MAIN_URL_ODC =
             "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionOnlineOdc.xhtml";
+    private static final String MAIN_URL_TAX =
+            "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionMainOnline.xhtml";
     private static final List<String> FIELD_LIST = Arrays.asList(
-            "Vehicle No.", "Vehicle Type", "Chassis No.", "Owner Name",
-            "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
+            "Vehicle No.", "Vehicle Type", "Chassis No.", "Owner Name", "Mobile No.",
+            "From State", "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
             "Load Carrying Capacity of Vehicle(In Kg.)", "Road Tax Validity",
             "Insurance Validity", "Fitness Validity", "PUCC Validity",
             "Registration Date", "Address"
@@ -45,6 +47,8 @@ public class P1Client {
         WebSourceContext ctx = new WebSourceContext(vehicleNum);
         ctx.setStateCode(stateCode);
         ctx.setOpCode(opCode);
+        ctx.setMAIN_URL((stateCode.equals("MH"))? MAIN_URL_ODC : MAIN_URL_TAX);
+
 
         // fetch initial cookies
         ctx.setCookie(fetchInitialCookie());
@@ -56,6 +60,7 @@ public class P1Client {
     private P1Response scrapeVehicleDetails(WebSourceContext ctx) throws Exception {
         // STEP-1: Initial GET
         String html = doGet(BASE_URL, ctx, null);
+        String MAIN_URL = ctx.getMAIN_URL();
         enrichContextFromHtml(ctx, html);
 
         // STEP-2: 3 POST calls
@@ -126,11 +131,12 @@ public class P1Client {
     private String buildBody(String step, WebSourceContext ctx, String vehicleNo, String html) throws Exception {
         String goButton = ctx.getGoButton();
         String viewState = ctx.getViewState();
+        ctx.setUpdateTag(ctx.getStateCode().equals("MH") ? "taxcollodc": "ortaxcollection");
 
         return switch (step) {
             case "STEP_1" -> buildStateSelectionPayload(ctx.getStateCode(), viewState);
             case "STEP_2" -> buildOperationSelectionPayload(ctx.getStateCode(), ctx.getOpCode(), goButton, viewState);
-            case "STEP_3"  -> buildVehicleSearchPayload(vehicleNo, viewState, html);
+            case "STEP_3"  -> buildVehicleSearchPayload(vehicleNo, viewState, html, ctx.getUpdateTag());
             default -> throw new IllegalArgumentException("Unknown step " + step);
         };
     }
@@ -142,7 +148,7 @@ public class P1Client {
         try {
             Document xmlDoc = Jsoup.parse(xmlResponse, Parser.xmlParser());
 
-            Element update = xmlDoc.select("update[id*=taxcollodc], update[id*=popup]").first();
+            Element update = xmlDoc.select("update[id*=" + ctx.getUpdateTag() + "], update[id*=popup]").first();
             if (update != null) {
                 Document content = Jsoup.parse(update.text());
 
@@ -172,6 +178,8 @@ public class P1Client {
                         case "PUCC Validity" -> data.setPuccValidity(value);
                         case "Registration Date" -> data.setRegistrationDate(value);
                         case "Address" -> data.setAddress(value);
+                        case "Mobile No." -> data.setMobile(value);
+                        case "From State" -> data.setState(value);
                     }
                 }
             }
@@ -179,7 +187,7 @@ public class P1Client {
             log.error("Failed to parse vehicle details for {}", ctx.getVehicleNum(), e);
         }
 
-        return new P1Response(200, "Success", data, "MH");
+        return new P1Response(200, "Success", data, ctx.getStateCode());
 
 
     }
@@ -260,7 +268,7 @@ public class P1Client {
     }
 
 
-    private String buildVehicleSearchPayload(String vehicleNum, String viewState, String html) throws Exception {
+    private String buildVehicleSearchPayload(String vehicleNum, String viewState, String html, String updateTag) throws Exception {
         Document doc = Jsoup.parse(html);
 
         Element vehicleInput = doc.selectFirst("input[maxlength='10']");
@@ -273,7 +281,7 @@ public class P1Client {
         payload.append("javax.faces.partial.ajax=true")
                 .append("&javax.faces.source=").append(btnName)
                 .append("&javax.faces.partial.execute=@all")
-                .append("&javax.faces.partial.render=taxcollodc popup")
+                .append("&javax.faces.partial.render=" + updateTag + " popup")
                 .append("&").append(btnName).append("=").append(btnName)
                 .append("&master_Layout_form=master_Layout_form")
                 .append("&").append(vehicleField).append("=").append(vehicleNum);

@@ -10,6 +10,8 @@ public class WebSourceContext {
     private String stateCode;
     private String opCode;
     private String goButton;
+    private String MAIN_URL;
+    private String updateTag;
 
     public WebSourceContext(String vehicleNum) {
         this.vehicleNum = vehicleNum;

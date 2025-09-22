@@ -49,4 +49,15 @@ public class ParivahanController {
                     .body("error" + e.getMessage());
         }
     }
+
+    @PostMapping("/od/tax/{vehicleNum}")
+    public ResponseEntity<String> fetchOdData(@PathVariable String vehicleNum) throws Exception {
+        try {
+            String response = p1Client.getData(vehicleNum, "OR", "5003");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("error" + e.getMessage());
+        }
+    }
 }

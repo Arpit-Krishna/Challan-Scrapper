@@ -8,6 +8,8 @@ public class P1Data {
     private String vehicleType;
     private String chassisNo;
     private String ownerName;
+    private String mobile;
+    private String state;
     private String vehicleClass;
     private String gvwKg;
     private String unladenWeightKg;
