@@ -20,4 +20,5 @@ public class P1Data {
     private String puccValidity;
     private String registrationDate;
     private String address;
+    private String seatingCapacity;
 }

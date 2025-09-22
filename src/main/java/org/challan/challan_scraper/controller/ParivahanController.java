@@ -60,4 +60,48 @@ public class ParivahanController {
                     .body("error" + e.getMessage());
         }
     }
+
+    @PostMapping("/jk/tax/{vehicleNum}")
+    public ResponseEntity<String> fetchJkData(@PathVariable String vehicleNum) throws Exception {
+        try {
+            String response = p1Client.getData(vehicleNum, "JK", "5003");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("error" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/jh/tax/{vehicleNum}")
+    public ResponseEntity<String> fetchJhData(@PathVariable String vehicleNum) throws Exception {
+        try {
+            String response = p1Client.getData(vehicleNum, "JH", "5003");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("error" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/br/tax/{vehicleNum}")
+    public ResponseEntity<String> fetchBrData(@PathVariable String vehicleNum) throws Exception {
+        try {
+            String response = p1Client.getData(vehicleNum, "BR", "5003");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("error" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/gj/tax/{vehicleNum}")
+    public ResponseEntity<String> fetchGjData(@PathVariable String vehicleNum) throws Exception {
+        try {
+            String response = p1Client.getData(vehicleNum, "GJ", "5003");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("error" + e.getMessage());
+        }
+    }
 }

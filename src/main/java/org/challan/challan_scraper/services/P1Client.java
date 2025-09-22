@@ -40,7 +40,8 @@ public class P1Client {
             "From State", "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
             "Load Carrying Capacity of Vehicle(In Kg.)", "Road Tax Validity",
             "Insurance Validity", "Fitness Validity", "PUCC Validity",
-            "Registration Date", "Address"
+            "Registration Date", "Address", "Seating Cap(Ex. Driver)"
+
     );
 
     public String getData(String vehicleNum, String stateCode, String opCode) throws Exception {
@@ -48,6 +49,12 @@ public class P1Client {
         ctx.setStateCode(stateCode);
         ctx.setOpCode(opCode);
         ctx.setMAIN_URL((stateCode.equals("MH"))? MAIN_URL_ODC : MAIN_URL_TAX);
+        if(stateCode.equals("MH")) {
+            ctx.setUpdateTag("taxcollodc");
+        }
+        else {
+            ctx.setUpdateTag(stateCode.toLowerCase() + "taxcollection");
+        }
 
 
         // fetch initial cookies
@@ -64,15 +71,15 @@ public class P1Client {
         enrichContextFromHtml(ctx, html);
 
         // STEP-2: 3 POST calls
-        doPost(BASE_URL, ctx, buildBody("STEP_1", ctx, null, html), true);
-        doPost(BASE_URL, ctx, buildBody("STEP_2", ctx, null, html), true);
+        doPost(BASE_URL, ctx, buildBody("STEP_1", ctx, null, html));
+        doPost(BASE_URL, ctx, buildBody("STEP_2", ctx, null, html));
 
         // STEP-3: GET main form page
         String formHtml = doGet(MAIN_URL, ctx, BASE_URL);
         enrichContextFromHtml(ctx, formHtml);
 
         // STEP-4: Final POST with vehicle number
-        String finalHtml = doPost(MAIN_URL, ctx, buildBody("STEP_3", ctx, ctx.getVehicleNum(), formHtml), true);
+        String finalHtml = doPost(MAIN_URL, ctx, buildBody("STEP_3", ctx, ctx.getVehicleNum(), formHtml));
 
         // Parse details
         return parseVehicleDetails(finalHtml, ctx);
@@ -102,19 +109,15 @@ public class P1Client {
         }
     }
 
-    private String doPost(String url, WebSourceContext ctx, String body, boolean ajax) throws Exception {
+    private String doPost(String url, WebSourceContext ctx, String body) throws Exception {
         MediaType mt = MediaType.parse("application/x-www-form-urlencoded; charset=UTF-8");
         Request.Builder req = new Request.Builder()
                 .url(url)
                 .post(RequestBody.create(mt, body))
                 .addHeader("Cookie", ctx.getCookie());
 
-        if (ajax) {
-            req.addHeader("Faces-Request", "partial/ajax")
-                    .addHeader("X-Requested-With", "XMLHttpRequest");
-        } else {
-            req.addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-        }
+        req.addHeader("Faces-Request", "partial/ajax").addHeader("X-Requested-With", "XMLHttpRequest");
+
         try (Response res = OkHttpUtils.getOkHttpClient(3500).newCall(req.build()).execute()) {
             String responseBody = res.body().string();
             // Update viewState if it's an XML ajax response
@@ -131,7 +134,6 @@ public class P1Client {
     private String buildBody(String step, WebSourceContext ctx, String vehicleNo, String html) throws Exception {
         String goButton = ctx.getGoButton();
         String viewState = ctx.getViewState();
-        ctx.setUpdateTag(ctx.getStateCode().equals("MH") ? "taxcollodc": "ortaxcollection");
 
         return switch (step) {
             case "STEP_1" -> buildStateSelectionPayload(ctx.getStateCode(), viewState);
@@ -180,6 +182,7 @@ public class P1Client {
                         case "Address" -> data.setAddress(value);
                         case "Mobile No." -> data.setMobile(value);
                         case "From State" -> data.setState(value);
+                        case "Seating Cap(Ex. Driver)" -> data.setSeatingCapacity(value);
                     }
                 }
             }
@@ -286,33 +289,9 @@ public class P1Client {
                 .append("&master_Layout_form=master_Layout_form")
                 .append("&").append(vehicleField).append("=").append(vehicleNum);
 
-        appendFormFields(doc, payload);
+
         payload.append("&javax.faces.ViewState=").append(enc(viewState));
         return payload.toString();
-    }
-
-    private void appendFormFields(Document doc, StringBuilder payload) {
-        for (Element select : doc.select("select")) {
-            String name = select.attr("name");
-            if (!name.isEmpty()) {
-                Element selected = select.selectFirst("option[selected]");
-                String value = selected != null ? selected.attr("value") : "-1";
-                payload.append("&").append(name).append("=").append(enc(value));
-            }
-        }
-        for (Element input : doc.select("input[type='text'], input[type='hidden']")) {
-            String name = input.attr("name");
-            if (!name.isEmpty() && !name.contains("ViewState")) {
-                payload.append("&").append(name).append("=").append(enc(input.attr("value")));
-            }
-        }
-        for (Element checkbox : doc.select("input[type='checkbox']")) {
-            String name = checkbox.attr("name");
-            if (!name.isEmpty()) {
-                String value = checkbox.hasAttr("checked") ? "on" : "off";
-                payload.append("&").append(name).append("=").append(value);
-            }
-        }
     }
 
     private String enc(String val) {
