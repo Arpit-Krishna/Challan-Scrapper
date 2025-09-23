@@ -171,6 +171,8 @@ public class P1Client {
                         case "Mobile No." -> data.setMobile(value);
                         case "From State" -> data.setState(value);
                         case "Seating Cap(Ex. Driver)" -> data.setSeatingCapacity(value);
+                        case "Sale Amount" -> data.setSaleAmount(value);
+                        case "Fuel"  -> data.setFuel(value);
                     }
                 }
             }
@@ -266,6 +268,11 @@ public class P1Client {
         String vehicleField = vehicleInput.attr("name") ;
 
         Element detailsBtn = doc.selectFirst("button[title*='get owner and vehicle details']");
+        Element detailsBtn1 = doc.selectFirst("button.ui-button:has(span.ui-button-text:contains(Get Details))");
+        if (detailsBtn == null && detailsBtn1 != null){
+            detailsBtn = detailsBtn1;
+        }
+
         String btnName = detailsBtn.attr("name");
 
         StringBuilder payload = new StringBuilder();

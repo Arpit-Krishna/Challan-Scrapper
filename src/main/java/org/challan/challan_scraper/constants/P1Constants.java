@@ -12,7 +12,7 @@ public class P1Constants {
     public static final String P1_TAX_COL_URL =
             "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionMainOnline.xhtml";
 
-    public static final List<String> stateCode
+    public static final List<String> stateCodes
             = Arrays.asList(
             "BR", "CG", "GA", "GJ", "HR", "HP", "JK", "JH", "KA", "KL", "MP",
             "MH", "OR", "PB", "RJ", "SK", "TN", "TR", "UP", "UK", "WB"
@@ -20,7 +20,7 @@ public class P1Constants {
     public static final HashMap<String, String> opCode = new HashMap<>() {{
         put("BR", "5003"); // BIHAR
         put("CG", "5003"); // CHHATTISGARH
-        put("GA", "5003"); // GOA
+        put("GA", "5001"); // GOA
         put("GJ", "5003"); // GUJARAT
         put("HR", "5003"); // HARYANA
         put("HP", "5003"); // HIMACHAL PRADESH
@@ -46,7 +46,8 @@ public class P1Constants {
             "From State", "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
             "Load Carrying Capacity of Vehicle(In Kg.)", "Road Tax Validity",
             "Insurance Validity", "Fitness Validity", "PUCC Validity",
-            "Registration Date", "Address", "Seating Cap(Ex. Driver)"
+            "Registration Date", "Address", "Seating Cap(Ex. Driver)",
+            "Sale Amount", "Fuel"
     );
 
 }

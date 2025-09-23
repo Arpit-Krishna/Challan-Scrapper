@@ -21,4 +21,6 @@ public class P1Data {
     private String registrationDate;
     private String address;
     private String seatingCapacity;
+    private String saleAmount;
+    private String fuel;
 }
