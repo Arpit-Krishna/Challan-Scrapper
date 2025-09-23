@@ -19,9 +19,9 @@ public class P1Constants {
     );
     public static final HashMap<String, String> opCode = new HashMap<>() {{
         put("BR", "5003"); // BIHAR
-        put("CG", "5003"); // CHHATTISGARH
-        put("GA", "5001"); // GOA
-        put("GJ", "5003"); // GUJARAT
+        put("CG", "5007"); // CHHATTISGARH
+        put("GA", "5020"); // GOA
+        put("GJ", "5007"); // GUJARAT
         put("HR", "5003"); // HARYANA
         put("HP", "5003"); // HIMACHAL PRADESH
         put("JK", "5003"); // JAMMU & KASHMIR
@@ -42,12 +42,12 @@ public class P1Constants {
     }};
 
     public static final List<String> FIELD_LIST = Arrays.asList(
-            "Vehicle No.", "Vehicle Type", "Chassis No.", "Owner Name", "Mobile No.",
-            "From State", "Vehicle Class", "GVW (In Kg.)", "Unladen Weight(In Kg.)",
+            "Vehicle No.", "Vehicle Type", "Chassis No.", "Owner Name", "Owner/Firm Name", "Vehicle Permit Type",
+            "Mobile No.", "From State", "Vehicle Class", "GVW (In Kg.)", "Gross Vehicle Weight(In Kg.)","Gross Vehicle Wt.(In Kg.)", "Unladen Weight(In Kg.)",
             "Load Carrying Capacity of Vehicle(In Kg.)", "Road Tax Validity",
-            "Insurance Validity", "Fitness Validity", "PUCC Validity",
-            "Registration Date", "Address", "Seating Cap(Ex. Driver)",
-            "Sale Amount", "Fuel"
+            "Insurance Validity", "Fitness Validity", "PUCC Validity", "Seating Capacity (Excluding Driver)",
+            "Registration Date", "Address", "Seating Cap(Ex. Driver)", "Seating cap ",
+            "Sale Amount", "Fuel", "Cubic Cap(CC)"
     );
 
 }

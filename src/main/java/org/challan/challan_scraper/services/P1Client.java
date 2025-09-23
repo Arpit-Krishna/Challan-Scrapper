@@ -37,13 +37,13 @@ public class P1Client {
 
         ctx.setStateCode(stateCode);
         ctx.setOpCode(opCode.get(stateCode));
-
-        ctx.setMAIN_URL((stateCode.equals("MH"))? P1_TAX_ODC_URL : P1_TAX_COL_URL);
-        if(stateCode.equals("MH")) {
+        if(stateCode.equals("MH") || stateCode.equals("CG") || stateCode.equals("GJ")) {
             ctx.setUpdateTag("taxcollodc");
+            ctx.setMAIN_URL(P1_TAX_ODC_URL);
         }
         else {
             ctx.setUpdateTag(stateCode.toLowerCase() + "taxcollection");
+            ctx.setMAIN_URL(P1_TAX_COL_URL);
         }
 
         ctx.setCookie(fetchInitialCookie());
@@ -155,11 +155,11 @@ public class P1Client {
                     String value = extractValue(inputEl);
 
                     switch (label) {
-                        case "Vehicle Type" -> data.setVehicleType(value);
+                        case "Vehicle Type", "Vehicle Permit Type" -> data.setVehicleType(value);
                         case "Chassis No." -> data.setChassisNo(value);
-                        case "Owner Name" -> data.setOwnerName(value);
+                        case "Owner Name", "Owner/Firm Name" -> data.setOwnerName(value);
                         case "Vehicle Class" -> data.setVehicleClass(value);
-                        case "GVW (In Kg.)" -> data.setGvwKg(value);
+                        case "GVW (In Kg.)", "Gross Vehicle Weight(In Kg.)", "Gross Vehicle Wt.(In Kg.)" -> data.setGvwKg(value);
                         case "Unladen Weight(In Kg.)" -> data.setUnladenWeightKg(value);
                         case "Load Carrying Capacity of Vehicle(In Kg.)" -> data.setLoadCapacityKg(value);
                         case "Road Tax Validity" -> data.setRoadTaxValidity(value);
@@ -170,9 +170,10 @@ public class P1Client {
                         case "Address" -> data.setAddress(value);
                         case "Mobile No." -> data.setMobile(value);
                         case "From State" -> data.setState(value);
-                        case "Seating Cap(Ex. Driver)" -> data.setSeatingCapacity(value);
+                        case "Seating Cap(Ex. Driver)", "Seating Capacity (Excluding Driver)", "Seating cap " -> data.setSeatingCapacity(value);
                         case "Sale Amount" -> data.setSaleAmount(value);
                         case "Fuel"  -> data.setFuel(value);
+                        case "Cubic Cap(CC)" -> data.setCC(value);
                     }
                 }
             }
@@ -272,7 +273,6 @@ public class P1Client {
         if (detailsBtn == null && detailsBtn1 != null){
             detailsBtn = detailsBtn1;
         }
-
         String btnName = detailsBtn.attr("name");
 
         StringBuilder payload = new StringBuilder();

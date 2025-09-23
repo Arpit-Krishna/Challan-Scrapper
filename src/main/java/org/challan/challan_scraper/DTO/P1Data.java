@@ -23,4 +23,5 @@ public class P1Data {
     private String seatingCapacity;
     private String saleAmount;
     private String fuel;
+    private String CC;
 }
