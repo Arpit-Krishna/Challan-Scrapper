@@ -24,7 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class MhOdcScrapper {
+public class  MhOdcScrapper {
 
     // ======= CONSTANTS =======
     private static final String BASE_URL = "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollection.xhtml";

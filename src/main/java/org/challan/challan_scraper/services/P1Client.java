@@ -253,12 +253,12 @@ public class P1Client {
     // ======= PAYLOAD BUILDERS =======
     private String buildStateSelectionPayload(String stateCode, String viewState) {
         return "javax.faces.partial.ajax=true&javax.faces.source=ib_state&javax.faces.partial.execute=ib_state&javax.faces.partial.render=operation_code&javax.faces.behavior.event=change" +
-                "&javax.faces.partial.event=change&master_Layout_form=master_Layout_form&ib_state_input=" + stateCode + "&operation_code_focus=&operation_code_input=-1&javax.faces.ViewState=" + enc(viewState);
+                "&javax.faces.partial.event=change&master_Layout_form=master_Layout_form&ib_state_input=" + stateCode + "&operation_code_focus=&operation_code_input=-1&javax.faces.ViewState=" + viewState;
     }
 
     private String buildOperationSelectionPayload(String stateCode, String opCode,String goButtonId, String viewState) {
         return "javax.faces.partial.ajax=true&javax.faces.source= " + goButtonId + "&javax.faces.partial.execute=%40all" + "&" + goButtonId + "=" + goButtonId + "&PAYMENT_TYPE=ONLINE" +
-                "&master_Layout_form=master_Layout_form&ib_state_focus=&ib_state_input=" +  stateCode + "&operation_code_focus=&operation_code_input=" + opCode +  "&javax.faces.ViewState=" + enc(viewState);
+                "&master_Layout_form=master_Layout_form&ib_state_focus=&ib_state_input=" +  stateCode + "&operation_code_focus=&operation_code_input=" + opCode +  "&javax.faces.ViewState=" + viewState;
     }
 
 
@@ -268,28 +268,99 @@ public class P1Client {
         Element vehicleInput = doc.selectFirst("input[maxlength='10']");
         String vehicleField = vehicleInput.attr("name") ;
 
-        Element detailsBtn = doc.selectFirst("button[title*='get owner and vehicle details']");
-        Element detailsBtn1 = doc.selectFirst("button.ui-button:has(span.ui-button-text:contains(Get Details))");
-        if (detailsBtn == null && detailsBtn1 != null){
-            detailsBtn = detailsBtn1;
-        }
+//        Element detailsBtn = doc.selectFirst("button[title*='get owner and vehicle details']");
+//        Element detailsBtn = doc.selectFirst("button.ui-button:has(span.ui-button-text:contains(Get Details))");
+        Element detailsBtn = doc.selectFirst("[type=submit]");
+        System.out.println(detailsBtn.attr("value"));
+
+//        if (detailsBtn == null && detailsBtn1 != null){
+//            detailsBtn = detailsBtn1;
+//        }
         String btnName = detailsBtn.attr("name");
 
         StringBuilder payload = new StringBuilder();
         payload.append("javax.faces.partial.ajax=true")
-                .append("&javax.faces.source=").append(btnName)
+                .append("javax.faces.partial.ajax=true").append(btnName)
                 .append("&javax.faces.partial.execute=@all")
                 .append("&javax.faces.partial.render=" + updateTag + " popup")
                 .append("&").append(btnName).append("=").append(btnName)
                 .append("&master_Layout_form=master_Layout_form")
                 .append("&").append(vehicleField).append("=").append(vehicleNum);
 
+        payload.append("&javax.faces.ViewState=").append(viewState );
+//        return payload.toString();
+        return "javax.faces.partial.ajax=truejavax.faces.partial.ajax=true" + btnName + "&javax.faces.partial.execute=@all&javax.faces.partial.render=" + updateTag +
+                " popup&" + btnName + "=" + btnName + "&master_Layout_form=master_Layout_form&" + vehicleField + "=" + vehicleNum + "&javax.faces.ViewState=" + viewState;
 
-        payload.append("&javax.faces.ViewState=").append(enc(viewState));
-        return payload.toString();
     }
 
     private String enc(String val) {
         return URLEncoder.encode(val, StandardCharsets.UTF_8);
+    }
+
+    public static void mergeP1Data(P1Data target, P1Data source) {
+        // Use reflection or a series of checks for each field.
+        // This is a simple implementation; a more robust solution might use a library like Apache Commons BeanUtils.
+
+        if (source.getVehicleNum() != null && !source.getVehicleNum().isEmpty()) {
+            target.setVehicleNum(source.getVehicleNum());
+        }
+        if (source.getVehicleType() != null && !source.getVehicleType().isEmpty()) {
+            target.setVehicleType(source.getVehicleType());
+        }
+        if (source.getChassisNo() != null && !source.getChassisNo().isEmpty()) {
+            target.setChassisNo(source.getChassisNo());
+        }
+        if (source.getOwnerName() != null && !source.getOwnerName().isEmpty()) {
+            target.setOwnerName(source.getOwnerName());
+        }
+        if (source.getMobile() != null && !source.getMobile().isEmpty()) {
+            target.setMobile(source.getMobile());
+        }
+        if (source.getState() != null && !source.getState().isEmpty()) {
+            target.setState(source.getState());
+        }
+        if (source.getVehicleClass() != null && !source.getVehicleClass().isEmpty()) {
+            target.setVehicleClass(source.getVehicleClass());
+        }
+        if (source.getGvwKg() != null && !source.getGvwKg().isEmpty()) {
+            target.setGvwKg(source.getGvwKg());
+        }
+        if (source.getUnladenWeightKg() != null && !source.getUnladenWeightKg().isEmpty()) {
+            target.setUnladenWeightKg(source.getUnladenWeightKg());
+        }
+        if (source.getLoadCapacityKg() != null && !source.getLoadCapacityKg().isEmpty()) {
+            target.setLoadCapacityKg(source.getLoadCapacityKg());
+        }
+        if (source.getRoadTaxValidity() != null && !source.getRoadTaxValidity().isEmpty()) {
+            target.setRoadTaxValidity(source.getRoadTaxValidity());
+        }
+        if (source.getInsuranceValidity() != null && !source.getInsuranceValidity().isEmpty()) {
+            target.setInsuranceValidity(source.getInsuranceValidity());
+        }
+        if (source.getFitnessValidity() != null && !source.getFitnessValidity().isEmpty()) {
+            target.setFitnessValidity(source.getFitnessValidity());
+        }
+        if (source.getPuccValidity() != null && !source.getPuccValidity().isEmpty()) {
+            target.setPuccValidity(source.getPuccValidity());
+        }
+        if (source.getRegistrationDate() != null && !source.getRegistrationDate().isEmpty()) {
+            target.setRegistrationDate(source.getRegistrationDate());
+        }
+        if (source.getAddress() != null && !source.getAddress().isEmpty()) {
+            target.setAddress(source.getAddress());
+        }
+        if (source.getSeatingCapacity() != null && !source.getSeatingCapacity().isEmpty()) {
+            target.setSeatingCapacity(source.getSeatingCapacity());
+        }
+        if (source.getSaleAmount() != null && !source.getSaleAmount().isEmpty()) {
+            target.setSaleAmount(source.getSaleAmount());
+        }
+        if (source.getFuel() != null && !source.getFuel().isEmpty()) {
+            target.setFuel(source.getFuel());
+        }
+        if (source.getCC() != null && !source.getCC().isEmpty()) {
+            target.setCC(source.getCC());
+        }
     }
 }

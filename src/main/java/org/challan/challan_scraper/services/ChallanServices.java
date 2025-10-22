@@ -165,7 +165,7 @@ public class ChallanServices {
 
     public static void main(String[] args) {
         ChallanServices service = new ChallanServices();
-        String html = service.fetchChallanHtml("GJ03JN3842");
+        String html = service.fetchAhmedabadChallanHtml("GJ03JN3842");
         System.out.println(html);
     }
 }

@@ -29,6 +29,16 @@ public class ChallanParser {
 
             challans.add(challan);
         }
+        if(html.contains("No Records Found!")) {
+            Map<String, String> datafound = new HashMap<>();
+            datafound.put("Data Found", "False");
+            challans.add(datafound);
+        }
+        else{
+            Map<String, String> datafound = new HashMap<>();
+            datafound.put("Data Found", "True");
+            challans.add(datafound);
+        }
 
         return challans;
     }

@@ -1,9 +1,13 @@
 package org.challan.challan_scraper.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.challan.challan_scraper.DTO.P1Data;
 import org.challan.challan_scraper.DTO.VehicleDetails;
 import org.challan.challan_scraper.services.ChallanServices;
 import org.challan.challan_scraper.services.P1Client;
 import org.challan.challan_scraper.services.ParivahanServicies;
+import org.challan.challan_scraper.utills.MapperUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,13 +23,11 @@ import static org.challan.challan_scraper.constants.P1Constants.stateCodes;
 @RequestMapping("/privahan")
 public class ParivahanController {
 
-    private final ParivahanServicies services;
     @Autowired
     private final P1Client p1Client;
 
     @Autowired
-    public ParivahanController(ParivahanServicies services,  P1Client p1Client) {
-        this.services = services;
+    public ParivahanController(P1Client p1Client) {
         this.p1Client = p1Client;
     }
     @PostMapping("/tax/{stateCode}/{vehicleNum}")
@@ -54,6 +56,33 @@ public class ParivahanController {
         }
         return ResponseEntity.ok(responses);
     }
+
+    @PostMapping("/rel/{vehicleNum}")
+    public ResponseEntity<String> fetchRelBulk(@PathVariable String vehicleNum) throws Exception {
+        P1Data mergedData = new P1Data();
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<String> stateCodes = List.of("MH", "KL", "OR");
+
+        for (String stateCode : stateCodes) {
+            try {
+                String rawResponse = p1Client.getData(vehicleNum, stateCode);
+                JsonNode rootNode = objectMapper.readTree(rawResponse);
+                JsonNode dataNode = rootNode.path("data");
+
+                P1Data stateData = objectMapper.treeToValue(dataNode, P1Data.class);
+                P1Client.mergeP1Data(mergedData, stateData);
+
+            } catch (Exception e) {
+                System.err.println("Error fetching data from " + stateCode + ": " + e.getMessage());
+            }
+        }
+
+        String finalResponse = MapperUtils.convertObjectToString(mergedData);
+
+        return ResponseEntity.ok(finalResponse);
+
+    }
+
 
 //    @PostMapping("/mh/odc/{vehicleNum}")
 //    public ResponseEntity<Map<String, String>> fetchVehicle(@PathVariable String vehicleNum) throws Exception {
