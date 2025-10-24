@@ -46,7 +46,7 @@ public class P1Client {
             ctx.setMAIN_URL(P1_TAX_COL_URL);
         }
 
-        ctx.setCookie(fetchInitialCookie());
+//        ctx.setCookie(fetchInitialCookie());
         P1Response resp = scrapeVehicleDetails(ctx);
 
         return MapperUtils.convertObjectToString(resp);
@@ -57,8 +57,9 @@ public class P1Client {
         String html = doGet(P1Constants.P1_HOMEPAGE_URL, ctx, null);
         String MAIN_URL = ctx.getMAIN_URL();
         enrichContextFromHtml(ctx, html);
+        System.out.println("GO Button " + ctx.getGoButton());
 
-        // STEP-2: 3 POST calls
+        // STEP-2: 2 POST calls
         doPost(P1Constants.P1_HOMEPAGE_URL, ctx, buildBody("STEP_1", ctx, null, html));
         doPost(P1Constants.P1_HOMEPAGE_URL, ctx, buildBody("STEP_2", ctx, null, html));
 
@@ -77,22 +78,42 @@ public class P1Client {
     //  HTTP helpers
     // ----------------------------------------------------------
 
-    private String fetchInitialCookie() throws Exception {
-        Request req = new Request.Builder().url(P1Constants.P1_HOMEPAGE_URL).get().build();
-        try (Response res = OkHttpUtils.getOkHttpClient(20000).newCall(req).execute()) {
-            if (res.code() != 200) throw new Exception("Failed to get homepage cookie");
-            List<String> cookies = Arrays.asList(res.headers("Set-Cookie").toArray(new String[0]));
-            String jsession = cookies.get(0).split(";")[0];
-            String serverId = cookies.size() > 1 ? cookies.get(1).split(";")[0] : "";
-            return serverId + ";" + jsession;
-        }
-    }
+//    private String fetchInitialCookie() throws Exception {
+//        Request req = new Request.Builder().url(P1Constants.P1_HOMEPAGE_URL).get().build();
+//        try (Response res = OkHttpUtils.getOkHttpClient(20000).newCall(req).execute()) {
+//            if (res.code() != 200) throw new Exception("Failed to get homepage cookie");
+//            List<String> cookies = Arrays.asList(res.headers("Set-Cookie").toArray(new String[0]));
+//            String jsession = cookies.get(0).split(";")[0];
+//            String serverId = cookies.size() > 1 ? cookies.get(1).split(";")[0] : "";
+//            return serverId + ";" + jsession;
+//        }
+//    }
 
     private String doGet(String url, WebSourceContext ctx, String referer) throws Exception {
         Request.Builder builder = new Request.Builder().url(url).get();
-        if (StringUtils.isNotBlank(referer)) builder.addHeader("Referer", referer);
-        builder.addHeader("Cookie", ctx.getCookie());
+        if (StringUtils.isNotBlank(referer)) {
+            builder.addHeader("Referer", referer);
+        }
+        if (StringUtils.isNotBlank(ctx.getCookie())) {
+            builder.addHeader("Cookie", ctx.getCookie());
+        }
+
         try (Response res = OkHttpUtils.getOkHttpClient(2000).newCall(builder.build()).execute()) {
+            if (!res.isSuccessful()) {
+                throw new Exception("GET request failed: " + res.code());
+            }
+
+            if (StringUtils.isBlank(ctx.getCookie())) {
+                List<String> cookies = res.headers("Set-Cookie");
+                if (!cookies.isEmpty()) {
+                    String cookieHeader = cookies.stream()
+                            .map(c -> c.split(";", 2)[0])
+                            .reduce((a, b) -> a + "; " + b)
+                            .orElse("");
+                    ctx.setCookie(cookieHeader);
+                    log.debug("Captured cookies: {}", cookieHeader);
+                }
+            }
             return res.body().string();
         }
     }
