@@ -1,0 +1,21 @@
+filename,expected_text,expected_label,predicted_text,predicted_label,match,success
+img_00501.png,4 - 2 = ?,2,4 - 2 = ?,2,true,true
+img_00502.png,8 - 1 = ?,7,8 - 1 = ?,7,true,true
+img_00503.png,3 + 8 = ?,11,3 + 8 = ?,11,true,true
+img_00504.png,5 + 5 = ?,10,5 + 5 = ?,10,true,true
+img_00505.png,8 - 1 = ?,7,8 - 1 = ?,7,true,true
+img_00506.png,8 - 4 = ?,4,8 - 4 = ?,4,true,true
+img_00507.png,5 + 7 = ?,12,5 + 7 = ?,12,true,true
+img_00508.png,1 + 1 = ?,2,1 + 1 = ?,2,true,true
+img_00509.png,2 + 4 = ?,6,2 + 4 = ?,6,true,true
+img_00510.png,6 + 8 = ?,14,6 + 8 = ?,14,true,true
+img_00511.png,7 - 3 = ?,4,7 - 3 = ?,4,true,true
+img_00512.png,6 + 7 = ?,13,6 + 7 = ?,13,true,true
+img_00513.png,5 + 7 = ?,12,5 + 7 = ?,12,true,true
+img_00514.png,8 - 1 = ?,7,8 - 1 = ?,7,true,true
+img_00515.png,2 + 4 = ?,6,2 + 4 = ?,6,true,true
+img_00516.png,2 + 4 = ?,6,2 + 4 = ?,6,true,true
+img_00517.png,1 + 2 = ?,3,1 + 2 = ?,3,true,true
+img_00518.png,1 + 5 = ?,6,1 + 5 = ?,6,true,true
+img_00519.png,8 - 1 = ?,7,8 - 1 = ?,7,true,true
+img_00520.png,6 + 7 = ?,13,6 + 7 = ?,13,true,true
