@@ -2,6 +2,7 @@ package org.challan.challan_scraper.controller;
 
 import org.challan.challan_scraper.services.OcrService;
 import org.challan.challan_scraper.services.OcrService2;
+import org.challan.challan_scraper.services.OcrService3;
 import org.challan.challan_scraper.utills.CsvUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.*;
@@ -20,6 +21,8 @@ public class OcrController {
     private OcrService ocrService;
     @Autowired
     private OcrService2 ocrService2;
+    @Autowired
+    private OcrService3 ocrService3;
 
     /**
      * Read text from a single image using the Python-equivalent OCR pipeline
@@ -43,7 +46,7 @@ public class OcrController {
 //                    "text", text,
 //                    "path", imagePath
 //            ));
-            Map<String, String> result = ocrService2.processArithmeticImage(imagePath);
+            Map<String, String> result = ocrService3.processArithmeticImage(imagePath);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             e.printStackTrace();
@@ -110,7 +113,7 @@ public class OcrController {
                 String imagePath = baseDir + File.separator + "synthetic_arith" + File.separator + filename;
 
                 // Run OCR and solve
-                Map<String, String> out = ocrService2.processArithmeticImage(imagePath);
+                Map<String, String> out = ocrService3.processArithmeticImage(imagePath);
 
                 String predictedExpr = out.getOrDefault("expression", "");
                 String predictedAnswer = out.getOrDefault("answer", "");
