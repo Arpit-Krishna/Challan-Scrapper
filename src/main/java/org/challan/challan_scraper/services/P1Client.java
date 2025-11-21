@@ -19,9 +19,8 @@ import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,7 +45,7 @@ public class P1Client {
             ctx.setMAIN_URL(P1_TAX_COL_URL);
         }
 
-//        ctx.setCookie(fetchInitialCookie());
+        ctx.setStateCd("?statecd=" + encode(stateCode));
         P1Response resp = scrapeVehicleDetails(ctx);
 
         return MapperUtils.convertObjectToString(resp);
@@ -54,21 +53,21 @@ public class P1Client {
 
     private P1Response scrapeVehicleDetails(WebSourceContext ctx) throws Exception {
         // STEP-1: Initial GET
-        String html = doGet(P1Constants.P1_HOMEPAGE_URL, ctx, null);
+        String html = doGet(P1Constants.P1_HOMEPAGE_URL + ctx.getStateCd(), ctx, P1_REFERRER_URL);
         String MAIN_URL = ctx.getMAIN_URL();
         enrichContextFromHtml(ctx, html);
         System.out.println("GO Button " + ctx.getGoButton());
 
+
         // STEP-2: 2 POST calls
         doPost(P1Constants.P1_HOMEPAGE_URL, ctx, buildBody("STEP_1", ctx, null, html));
-        doPost(P1Constants.P1_HOMEPAGE_URL, ctx, buildBody("STEP_2", ctx, null, html));
 
         // STEP-3: GET main form page
         String formHtml = doGet(MAIN_URL, ctx, P1Constants.P1_HOMEPAGE_URL);
         enrichContextFromHtml(ctx, formHtml);
 
         // STEP-4: Final POST with vehicle number
-        String finalHtml = doPost(MAIN_URL, ctx, buildBody("STEP_3", ctx, ctx.getVehicleNum(), formHtml));
+        String finalHtml = doPost(MAIN_URL, ctx, buildBody("STEP_2", ctx, ctx.getVehicleNum(), formHtml));
 
         // Parse details
         return parseVehicleDetails(finalHtml, ctx);
@@ -125,11 +124,10 @@ public class P1Client {
                 .post(RequestBody.create(mt, body))
                 .addHeader("Cookie", ctx.getCookie());
 
-        req.addHeader("Faces-Request", "partial/ajax").addHeader("X-Requested-With", "XMLHttpRequest");
+        req.addHeader("Faces-Request", "partial/ajax").addHeader("X-Requested-With", "XMLHttpRequest").addHeader("referer", url + ctx.getStateCd());
 
         try (Response res = OkHttpUtils.getOkHttpClient(3500).newCall(req.build()).execute()) {
             String responseBody = res.body().string();
-            // Update viewState if it's an XML ajax response
             String vs = extractViewState(responseBody, false);
             if (StringUtils.isNotBlank(vs)) ctx.setViewState(vs);
             return responseBody;
@@ -145,9 +143,8 @@ public class P1Client {
         String viewState = ctx.getViewState();
 
         return switch (step) {
-            case "STEP_1" -> buildStateSelectionPayload(ctx.getStateCode(), viewState);
-            case "STEP_2" -> buildOperationSelectionPayload(ctx.getStateCode(), ctx.getOpCode(), goButton, viewState);
-            case "STEP_3"  -> buildVehicleSearchPayload(vehicleNo, viewState, html, ctx.getUpdateTag());
+            case "STEP_1" -> buildOperationSelectionPayload(ctx.getStateCode(), ctx.getOpCode(), goButton, viewState);
+            case "STEP_2"  -> buildVehicleSearchPayload(vehicleNo, viewState, html, ctx.getUpdateTag());
             default -> throw new IllegalArgumentException("Unknown step " + step);
         };
     }
@@ -272,14 +269,10 @@ public class P1Client {
 
 
     // ======= PAYLOAD BUILDERS =======
-    private String buildStateSelectionPayload(String stateCode, String viewState) {
-        return "javax.faces.partial.ajax=true&javax.faces.source=ib_state&javax.faces.partial.execute=ib_state&javax.faces.partial.render=operation_code&javax.faces.behavior.event=change" +
-                "&javax.faces.partial.event=change&master_Layout_form=master_Layout_form&ib_state_input=" + stateCode + "&operation_code_focus=&operation_code_input=-1&javax.faces.ViewState=" + viewState;
-    }
 
-    private String buildOperationSelectionPayload(String stateCode, String opCode,String goButtonId, String viewState) {
+    private String buildOperationSelectionPayload(String stateCode, String opCode, String goButtonId, String viewState) {
         return "javax.faces.partial.ajax=true&javax.faces.source= " + goButtonId + "&javax.faces.partial.execute=%40all" + "&" + goButtonId + "=" + goButtonId + "&PAYMENT_TYPE=ONLINE" +
-                "&master_Layout_form=master_Layout_form&ib_state_focus=&ib_state_input=" +  stateCode + "&operation_code_focus=&operation_code_input=" + opCode +  "&javax.faces.ViewState=" + viewState;
+                "&master_Layout_form=master_Layout_form&ib_state_filter=&operation_code_input=" + opCode +  "&javax.faces.ViewState=" + viewState;
     }
 
 
@@ -315,8 +308,20 @@ public class P1Client {
 
     }
 
-    private String enc(String val) {
-        return URLEncoder.encode(val, StandardCharsets.UTF_8);
+    private static String stringToHex(String input) {
+        StringBuilder sb = new StringBuilder();
+
+        for (char c : input.toCharArray()) {
+            sb.append(String.format("%02x", (int) c));
+        }
+
+        return sb.toString();
+    }
+
+    public static String encode(String hex) {
+        String hexAscii = stringToHex("7c606d287b6d6b7" + hex);
+        byte[] asciiBytes = hexAscii.getBytes(StandardCharsets.UTF_8);
+        return Base64.getEncoder().encodeToString(asciiBytes);
     }
 
     public static void mergeP1Data(P1Data target, P1Data source) {

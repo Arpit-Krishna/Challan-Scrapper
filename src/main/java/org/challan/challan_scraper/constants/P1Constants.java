@@ -11,7 +11,8 @@ public class P1Constants {
             "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionOnlineOdc.xhtml";
     public static final String P1_TAX_COL_URL =
             "https://checkpost.parivahan.gov.in/checkpost/faces/public/payment/TaxCollectionMainOnline.xhtml";
-
+    public static final String P1_REFERRER_URL =
+            "https://parivahan.gov.in/";
     public static final List<String> stateCodes
             = Arrays.asList(
             "BR", "CG", "GA", "GJ", "HR", "HP", "JK", "JH", "KA", "KL", "MP",

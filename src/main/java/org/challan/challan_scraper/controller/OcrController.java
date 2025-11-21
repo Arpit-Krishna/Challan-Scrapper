@@ -1,13 +1,26 @@
 package org.challan.challan_scraper.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.MediaType;
+import org.bytedeco.opencv.presets.opencv_core;
+import org.challan.challan_scraper.DTO.S26Context;
+import org.springframework.web.bind.annotation.*;
+
 import org.challan.challan_scraper.services.OcrService;
 import org.challan.challan_scraper.services.OcrService2;
 import org.challan.challan_scraper.services.OcrService3;
+import org.challan.challan_scraper.services.OcrService4;
 import org.challan.challan_scraper.utills.CsvUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.*;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+
+
 
 import java.io.File;
 import java.nio.file.*;
@@ -23,10 +36,40 @@ public class OcrController {
     private OcrService2 ocrService2;
     @Autowired
     private OcrService3 ocrService3;
+    @Autowired
+    private OcrService4 ocrService4;
 
     /**
      * Read text from a single image using the Python-equivalent OCR pipeline
      */
+
+    @GetMapping("/tsch/bulk")
+    public ResponseEntity<?> tsch_bulk(@org.springframework.web.bind.annotation.RequestBody List<String> vehicleNumbers) {
+        try {
+            List<String> responses = new ArrayList<>();
+            for (String vehicleNumber : vehicleNumbers) {
+                String response = ocrService4.getData(vehicleNumber);
+                responses.add(response);
+            }
+            return new ResponseEntity<>(responses, HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/tsch")
+    public ResponseEntity<?> tsch(@RequestParam String vehicleNum) {
+        try {
+            return ResponseEntity.ok(ocrService4.getData(vehicleNum));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/read")
     public ResponseEntity<?> readImage(@RequestParam String imageName) {
         try {
@@ -244,26 +287,26 @@ public class OcrController {
     /**
      * Download the generated results CSV file
      */
-    @GetMapping("/download")
-    public ResponseEntity<Resource> downloadResult(@RequestParam("path") String path) {
-        try {
-            Path p = Paths.get(path);
-            if (!Files.exists(p)) {
-                return ResponseEntity.notFound().build();
-            }
-
-            Resource r = new UrlResource(p.toUri());
-            String fn = p.getFileName().toString();
-
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType("text/csv"))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fn + "\"")
-                    .body(r);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
+//    @GetMapping("/download")
+//    public ResponseEntity<Resource> downloadResult(@RequestParam("path") String path) {
+//        try {
+//            Path p = Paths.get(path);
+//            if (!Files.exists(p)) {
+//                return ResponseEntity.notFound().build();
+//            }
+//
+//            Resource r = new UrlResource(p.toUri());
+//            String fn = p.getFileName().toString();
+//
+//            return ResponseEntity.ok()
+//                    .contentType(MediaType.parseMediaType("text/csv"))
+//                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fn + "\"")
+//                    .body(r);
+//        } catch (Exception ex) {
+//            ex.printStackTrace();
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+//        }
+//    }
 
     /**
      * Health check endpoint
@@ -276,4 +319,99 @@ public class OcrController {
                 "method", "Python-equivalent preprocessing"
         ));
     }
+
+    @GetMapping("/test-fastapi")
+    public ResponseEntity<?> testFastApi(@RequestParam("csv") String csvFileName) {
+
+        try {
+            String baseDir = System.getProperty("user.dir");
+            String csvPath = baseDir + File.separator + "synthetic_arith" + File.separator + csvFileName;
+
+            File csvFile = new File(csvPath);
+            if (!csvFile.exists()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "CSV not found: " + csvPath));
+            }
+
+            List<Map<String, String>> rows = CsvUtils.readCsv(csvPath);
+            List<Map<String, Object>> results = new ArrayList<>();
+
+            int correct = 0;
+            int failed = 0;
+            int total = rows.size();
+
+            OkHttpClient client = new OkHttpClient();
+
+            for (Map<String, String> row : rows) {
+
+                String filename = row.get("filename");
+                String expectedText = row.get("text");
+                String expectedAnswer = row.get("label");
+
+                String imagePath = baseDir + File.separator + "synthetic_arith" + File.separator + filename;
+                File imageFile = new File(imagePath);
+
+                if (!imageFile.exists()) {
+                    failed++;
+                    results.add(Map.of(
+                            "filename", filename,
+                            "error", "Image not found"
+                    ));
+                    continue;
+                }
+
+                // ------------ CALL FASTAPI OCR SERVICE ------------
+                RequestBody requestBody = RequestBody.create(
+                        imageFile,
+                        MediaType.parse("application/octet-stream")
+                );
+
+                Request request = new Request.Builder()
+                        .url("http://localhost:8000/ocr/bytes")
+                        .post(requestBody)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+
+                assert response.body() != null;
+                String fastApiJson = response.body().string();
+                Map ocrOut = new ObjectMapper().readValue(fastApiJson, Map.class);
+
+                String predicted = (String) ocrOut.getOrDefault("answer", "");
+                boolean success = (boolean) ocrOut.get("success");
+                boolean match = predicted.equals(expectedAnswer);
+
+                if (match) correct++;
+                if (!success || predicted.isEmpty()) failed++;
+
+                // ------------ BUILD RESULT RECORD ------------
+                Map<String, Object> rec = new LinkedHashMap<>();
+                rec.put("filename", filename);
+                rec.put("expected_text", expectedText);
+                rec.put("expected_label", expectedAnswer);
+                rec.put("predicted_text", ocrOut.get("expression"));
+                rec.put("predicted_label", predicted);
+                rec.put("match", match);
+                rec.put("success", success);
+
+                results.add(rec);
+            }
+
+            // ------------ SUMMARY ------------
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("total", total);
+            summary.put("correct", correct);
+            summary.put("failed", failed);
+            summary.put("accuracy", (correct * 100.0) / total + "%");
+            summary.put("results", results);
+
+            return ResponseEntity.ok(summary);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
 }
