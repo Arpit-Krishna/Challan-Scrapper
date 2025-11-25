@@ -143,7 +143,7 @@ public class P1Client {
         String viewState = ctx.getViewState();
 
         return switch (step) {
-            case "STEP_1" -> buildOperationSelectionPayload(ctx.getStateCode(), ctx.getOpCode(), goButton, viewState);
+            case "STEP_1" -> buildOperationSelectionPayload(ctx.getOpCode(), goButton, viewState);
             case "STEP_2"  -> buildVehicleSearchPayload(vehicleNo, viewState, html, ctx.getUpdateTag());
             default -> throw new IllegalArgumentException("Unknown step " + step);
         };
@@ -270,7 +270,7 @@ public class P1Client {
 
     // ======= PAYLOAD BUILDERS =======
 
-    private String buildOperationSelectionPayload(String stateCode, String opCode, String goButtonId, String viewState) {
+    private String buildOperationSelectionPayload(String opCode, String goButtonId, String viewState) {
         return "javax.faces.partial.ajax=true&javax.faces.source= " + goButtonId + "&javax.faces.partial.execute=%40all" + "&" + goButtonId + "=" + goButtonId + "&PAYMENT_TYPE=ONLINE" +
                 "&master_Layout_form=master_Layout_form&ib_state_filter=&operation_code_input=" + opCode +  "&javax.faces.ViewState=" + viewState;
     }

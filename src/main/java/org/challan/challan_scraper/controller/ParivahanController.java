@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.challan.challan_scraper.DTO.P1Data;
 import org.challan.challan_scraper.DTO.VehicleDetails;
 import org.challan.challan_scraper.services.ChallanServices;
+import org.challan.challan_scraper.services.P1;
 import org.challan.challan_scraper.services.P1Client;
 import org.challan.challan_scraper.services.ParivahanServicies;
 import org.challan.challan_scraper.utills.MapperUtils;
@@ -25,10 +26,13 @@ public class ParivahanController {
 
     @Autowired
     private final P1Client p1Client;
+    @Autowired
+    private final P1 p1;
 
     @Autowired
-    public ParivahanController(P1Client p1Client) {
+    public ParivahanController(P1Client p1Client, P1 p1) {
         this.p1Client = p1Client;
+        this.p1 = p1;
     }
     @PostMapping("/tax/{stateCode}/{vehicleNum}")
     public ResponseEntity<String> fetchData(@PathVariable String stateCode, @PathVariable String vehicleNum) throws Exception {
@@ -48,7 +52,7 @@ public class ParivahanController {
         List<String> responses = new ArrayList<>();
         for (String stateCode : stateCodes) {
             try {
-                String response = p1Client.getData(vehicleNum, stateCode);
+                String response = p1.getData(vehicleNum, stateCode);
                 responses.add("[" + stateCode + "] " + response);
             } catch (Exception e) {
                 responses.add("[" + stateCode + "] ERROR: " + e.getMessage());
