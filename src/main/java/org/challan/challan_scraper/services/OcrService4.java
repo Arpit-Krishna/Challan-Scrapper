@@ -40,6 +40,7 @@ public class OcrService4 {
 
     private static final String S26_URL = "https://echallan.tspolice.gov.in/publicview/PendingChallans.do";
     private static  String S26_CAPTCHA = "https://echallan.tspolice.gov.in/publicview/GetCaptcha?ctrl=new&_csrfToeknVehNo=%s&t=%s";
+    private static String OCR_URL = "http://internal-pvt-carinfo-prd-alb-602286310.ap-south-1.elb.amazonaws.com/ts-captcha";
 
     public String getData(String vehicleNum) throws Exception {
         S26Context s26Context = new S26Context();
@@ -173,7 +174,7 @@ public class OcrService4 {
         );
 
         Request request = new Request.Builder()
-                .url("http://localhost:8000/ocr/bytes")
+                .url(OCR_URL)
                 .post(requestBody)
                 .build();
         OkHttpClient client = new OkHttpClient();
@@ -183,8 +184,9 @@ public class OcrService4 {
         String fastApiJson = response.body().string();
         Map ocrOut = new ObjectMapper().readValue(fastApiJson, Map.class);
         System.out.println(ocrOut);
-        s26Context.setCaptchaText(ocrOut.get("expression").toString());
-        md5Hash((String) ocrOut.get("answer"), s26Context);
+        Map extractedCaptcha = (Map) ocrOut.get("extracted_text");
+        s26Context.setCaptchaText(extractedCaptcha.get("expression").toString());
+        md5Hash((String) extractedCaptcha.get("answer"), s26Context);
     }
 
 

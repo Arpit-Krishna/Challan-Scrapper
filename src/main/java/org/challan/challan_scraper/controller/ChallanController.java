@@ -1,7 +1,10 @@
 package org.challan.challan_scraper.controller;
 
 
+import org.challan.challan_scraper.DTO.WbChallanDTO;
 import org.challan.challan_scraper.services.ChallanServices;
+import org.challan.challan_scraper.services.OcrService4;
+import org.challan.challan_scraper.services.WbChallanService;
 import org.challan.challan_scraper.utills.ChallanParser;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,7 +14,8 @@ import java.util.*;
 @RequestMapping("/state")
 public class ChallanController {
     private final ChallanServices challanService = new ChallanServices();
-
+    private final WbChallanService wbChallanService = new WbChallanService();
+    private final OcrService4 ocrService4 = new OcrService4();
     @GetMapping("/rajkot")
     public List<Map<String, String>> getRajkotChallans(@RequestParam("vehicleNumber") String vehicleNumber) {
         if (vehicleNumber == null || vehicleNumber.isBlank()) {
@@ -72,6 +76,22 @@ public class ChallanController {
             }
         }
         return response;
+    }
+
+    @GetMapping("/wb")
+    public List<WbChallanDTO> getWbChallans(@RequestParam("vehicleNumber") String vehicleNumber) {
+        if (vehicleNumber == null || vehicleNumber.isBlank()) {
+            throw new IllegalArgumentException("vehicleNumber is required");
+        }
+        return wbChallanService.getData(vehicleNumber);
+    }
+
+    @GetMapping("/ts")
+    public String getTsChallans(@RequestParam("vehicleNumber") String vehicleNumber) throws Exception {
+        if (vehicleNumber == null || vehicleNumber.isBlank()) {
+            throw new IllegalArgumentException("vehicleNumber is required");
+        }
+        return ocrService4.getData(vehicleNumber);
     }
 }
 

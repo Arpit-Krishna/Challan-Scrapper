@@ -1,7 +1,6 @@
 package org.challan.challan_scraper.DTO;
 
 import lombok.Data;
-import org.bytedeco.opencv.presets.opencv_core;
 
 @Data
 public class S26Context {
